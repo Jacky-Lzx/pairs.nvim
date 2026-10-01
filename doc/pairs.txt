@@ -115,17 +115,30 @@ Opt-in, with treesitter=true and an installed Markdown parser: >lua
 At the end of a new opening line with exactly three backticks and an optional
 language/info string, <CR> adds a middle and closing line. The cursor remains
 on the middle line. The info string is retained; both lines use the opening
-line's indentation, which may contain zero to three spaces.
+line's indentation, which may contain zero to three spaces relative to a
+containing list/quote.
 
-Existing body content or a closing fence uses ordinary Enter. At a confirmed
-closing delimiter, each backtick skips one character; longer closing fences
-are recognized. The outer Markdown block tree owns these boundaries even when
-the body has an injected code-language parser.
+Existing body content or a closing fence inserts one line, preserving the
+block. Within a container, that line receives the continuation prefix.
+At a confirmed closing delimiter, each backtick skips one character. Longer
+closing fences are recognized. The outer Markdown tree owns these boundaries
+even when the body has an injected code-language parser.
 
-The initial rule supports top-level triple-backtick openers. Inline code, HTML,
-indented code, longer/tilde openers and list/blockquote fences keep ordinary
-input behavior. The rule does not enable inline backtick pairing. Enter inside
-the info string also stays ordinary. See CommonMark 4.5 for the syntax contract.
+Triple-backtick openers work at the top level, in lists/block quotes and in
+nested combinations. List markers become continuation indentation; quote
+markers remain. For example, Enter after '> - ```lua' creates: >
+    > - ```lua
+    >   |
+    >   ```
+<
+The | represents the cursor. Prefix tabs become spaces at Markdown's four-column
+tab stops, independently of buffer tabstop/expandtab. Native comment leaders
+and indentexpr do not duplicate or change the generated prefix.
+
+Inline code, HTML, indented code relative to its container, longer/tilde openers
+and task-marker text retain ordinary input. Inline backtick pairing is not
+enabled. Enter inside the info string or existing body stays native. See
+CommonMark 4.5, 5.1 and 5.2 for the syntax contract.
 
 close defaults to '```'; open/newline/skip default to true. Expansion requires
 both open and newline. false disables the rule. Overrides follow global,

@@ -80,6 +80,54 @@ local function string_context(buf, node)
   }
 end
 
+-- Markdown measures indentation using fixed four-column tab stops.
+local function markdown_columns(text)
+  local col = 0
+  for char in text:gmatch(".") do
+    col = col + (char == "\t" and 4 - col % 4 or 1)
+  end
+  return col
+end
+
+-- Container markers come from the outer grammar. Replace opening list markers
+-- with continuation spaces; keep quote markers and any existing indentation.
+local function fence_prefix(node, row, prefix)
+  local parent, containers, quotes = node:parent(), false, 0
+  while parent do
+    if parent:type() == "list_item" then
+      containers = true
+      local marker = parent:named_child(0)
+      if not marker or not marker:type():find("list_marker_", 1, true) then
+        return nil
+      end
+      local sr, sc, er, ec = marker:range()
+      if sr == row then
+        if er ~= row or ec > #prefix then
+          return nil
+        end
+        prefix = prefix:sub(1, sc)
+          .. prefix:sub(sc + 1, ec):gsub("[^ \t]", " ")
+          .. prefix:sub(ec + 1)
+      end
+    elseif parent:type() == "block_quote" then
+      containers, quotes = true, quotes + 1
+    end
+    parent = parent:parent()
+  end
+  local _, count = prefix:gsub(">", "")
+  if prefix:find("[^ >\t]") or count ~= quotes then
+    return nil
+  end
+  -- Markdown defines tab stops every four columns, independently of tabstop.
+  local col = 0
+  prefix = prefix:gsub(".", function(char)
+    local width = char == "\t" and 4 - col % 4 or 1
+    col = col + width
+    return char == "\t" and string.rep(" ", width) or char
+  end)
+  return prefix, containers
+end
+
 local function markdown_fence(buf, parser, range)
   local tree = parser:tree_for_range(range)
   if not tree then
@@ -89,15 +137,24 @@ local function markdown_fence(buf, parser, range)
   while node do
     if node:type() == "fenced_code_block" then
       local opening = node:named_child(0)
-      local last = node:named_child(node:named_child_count() - 1)
+      local last
       if not opening or opening:type() ~= "fenced_code_block_delimiter" then
         return nil
       end
-      local row = opening:range()
-      local indent, ticks = line(buf, row):match("^( *)(`+)[^`]*$")
+      local row, col = opening:range()
+      local text = line(buf, row)
+      local indent, ticks = text:sub(col + 1):match("^([ \t]*)(`+)[^`]*$")
+      local prefix, containers
+      if
+        indent
+        and markdown_columns(text:sub(1, col + #indent)) - markdown_columns(text:sub(1, col)) <= 3
+      then
+        prefix, containers = fence_prefix(node, row, text:sub(1, col + #indent))
+      end
       local result = {
         open_row = row,
-        supported = indent ~= nil and #indent <= 3 and ticks == "```",
+        supported = prefix ~= nil and ticks == "```",
+        prefix = containers and prefix or nil,
         has_content = false,
       }
       -- The block has at most a few direct children. Content descendants are
@@ -105,17 +162,34 @@ local function markdown_fence(buf, parser, range)
       for child in node:iter_children() do
         if child:type() == "code_fence_content" then
           result.has_content = true
+        elseif child:type() == "fenced_code_block_delimiter" and child:range() > row then
+          last = child
         end
       end
-      if
-        node:named_child_count() > 1
-        and last:type() == "fenced_code_block_delimiter"
-        and not last:missing()
-      then
-        local cr = last:range()
-        local spaces, run = line(buf, cr):match("^( *)(`+)[ \t]*$")
-        if spaces and #spaces <= 3 and #run >= 3 then
-          result.close_row, result.close_col, result.close_end = cr, #spaces, #spaces + #run
+      if last and not last:missing() then
+        local cr, cc = last:range()
+        local closing = line(buf, cr)
+        -- The grammar sometimes excludes excessive closing indentation from
+        -- the delimiter node. Count from the container continuation instead.
+        local base = 0
+        local continuation = tree:root():named_descendant_for_range(cr, 0, cr, 0)
+        if continuation:type() == "block_continuation" then
+          local sr, _, er, ec = continuation:range()
+          if sr == cr and er == cr then
+            base = ec
+          end
+        end
+        local spaces, run = closing:sub(base + 1):match("^([ \t]*)(`+)[ \t]*$")
+        if
+          spaces
+          and #run >= 3
+          and base + #spaces >= cc
+          and markdown_columns(closing:sub(1, base + #spaces))
+              - markdown_columns(closing:sub(1, base))
+            <= 3
+        then
+          result.close_row = cr
+          result.close_col, result.close_end = base + #spaces, base + #spaces + #run
         end
       end
       return result

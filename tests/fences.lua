@@ -77,8 +77,140 @@ return function(h)
   case("Enter in middle of info string", "```py│thon", "<CR>", "```py\n│thon")
   case("Enter before trailing whitespace", "```lua│  ", "<CR>", "```lua\n│")
   case("HTML block does not open fence", "<div>\n```│\n</div>", "<CR>", "<div>\n```\n│\n</div>")
-  case("list opener retains native behavior", "- ```lua│", "<CR>", "- ```lua\n│")
-  case("quote opener retains native behavior", "> ```lua│", "<CR>", "> ```lua\n│")
+  case("list opener", "- ```lua│", "<CR>body", "- ```lua\n  body│\n  ```")
+  case("quote opener", "> ```lua│", "<CR>body", "> ```lua\n> body│\n> ```")
+  for _, example in ipairs({
+    { "- ", "  " },
+    { "+ ", "  " },
+    { "* ", "  " },
+    { "12. ", "    " },
+    { "123) ", "     " },
+    { "  - ", "    " },
+    { "-   ", "    " },
+    { ">", ">" },
+    { "> > ", "> > " },
+    { ">> ", ">> " },
+    { "  > ", "  > " },
+    { ">   ", ">   " },
+    { "- > ", "  > " },
+    { "> - ", ">   " },
+    { "> - > ", ">   > " },
+    { "- - ", "    " },
+    { "-\t", "    " },
+    { "> \t", ">   " },
+  }) do
+    local opening, prefix = unpack(example)
+    case(
+      "container prefix " .. vim.inspect(opening),
+      opening .. "```lua│",
+      "<CR>body",
+      opening .. "```lua\n" .. prefix .. "body│\n" .. prefix .. "```"
+    )
+    case(
+      "container closer " .. vim.inspect(opening),
+      opening .. "```lua\n" .. prefix .. "body\n" .. prefix .. "│```",
+      "```",
+      opening .. "```lua\n" .. prefix .. "body\n" .. prefix .. "```│"
+    )
+  end
+  case("continuous list input", "│", "- ```lua<CR>body", "- ```lua\n  body│\n  ```")
+  case("continuous quote input", "│", "> ```lua<CR>body", "> ```lua\n> body│\n> ```")
+  case("list continuation", "- item\n  ```lua│", "<CR>body", "- item\n  ```lua\n  body│\n  ```")
+  case(
+    "list relative fence indentation",
+    "- item\n    ```lua│",
+    "<CR>body",
+    "- item\n    ```lua\n    body│\n    ```"
+  )
+  case(
+    "quote continuation",
+    "> item\n> ```lua│",
+    "<CR>body",
+    "> item\n> ```lua\n> body│\n> ```"
+  )
+  case(
+    "nested list continuation",
+    "- item\n  - ```lua│",
+    "<CR>body",
+    "- item\n  - ```lua\n    body│\n    ```"
+  )
+  case("reuse list closer", "- ```lua│\n  ```", "<CR>body", "- ```lua\n  body│\n  ```")
+  case("reuse quote closer", "> ```lua│\n> ```", "<CR>body", "> ```lua\n> body│\n> ```")
+  case(
+    "quote closer before paragraph",
+    "> ```lua\n> body\n> │```\n> after",
+    "```",
+    "> ```lua\n> body\n> ```│\n> after"
+  )
+  case(
+    "list closer before paragraph",
+    "- ```lua\n  body\n  │```\n  after",
+    "```",
+    "- ```lua\n  body\n  ```│\n  after"
+  )
+  case(
+    "reuse quote closer before paragraph",
+    "> ```lua│\n> ```\n> after",
+    "<CR>body",
+    "> ```lua\n> body│\n> ```\n> after"
+  )
+  case(
+    "reuse list closer before paragraph",
+    "- ```lua│\n  ```\n  after",
+    "<CR>body",
+    "- ```lua\n  body│\n  ```\n  after"
+  )
+  case("preserve quote content", "> ```lua│\n> body", "<CR>", "> ```lua\n> │\n> body")
+  case(
+    "reuse mixed closer",
+    "> - ```lua│\n>   ```",
+    "<CR>body",
+    "> - ```lua\n>   body│\n>   ```"
+  )
+  case(
+    "four-space quote closer is body",
+    "> ```\n>     │```\n> ```",
+    "```",
+    "> ```\n>     ```│```\n> ```"
+  )
+  case(
+    "four-space list closer is body",
+    "- ```\n      │```\n  ```",
+    "```",
+    "- ```\n      ```│```\n  ```"
+  )
+  case("four-space quote opener is code", ">     ```│", "<CR>", ">     ```\n│")
+  case("task text is not a fence", "- [ ] ```lua│", "<CR>", "- [ ] ```lua\n│")
+  case(
+    "task continuation fence",
+    "- [ ] task\n  ```lua│",
+    "<CR>body",
+    "- [ ] task\n  ```lua\n  body│\n  ```"
+  )
+  case(
+    "HTML in quote stays ordinary",
+    "> <div>\n> ```│\n> </div>",
+    "<CR>",
+    "> <div>\n> ```\n│\n> </div>"
+  )
+  case("longer quote opener remains literal", "> ````│", "<CR>", "> ````\n│")
+  case("tilde list opener remains literal", "- ~~~│", "<CR>", "- ~~~\n│")
+  case(
+    "relative four spaces are code",
+    "- item\n      ```│",
+    "<CR>",
+    "- item\n      ```\n      │"
+  )
+  case("quote language string midpoint", "> ```py│thon", "<CR>", "> ```py\n│thon")
+  case("quote opening disabled", "> ```lua│", "<CR>", "> ```lua\n│", options({ open = false }))
+  case("quote skip disabled", "> ```\n> │```", "`", "> ```\n> `│```", options({ skip = false }))
+  case(
+    "list newline disabled",
+    "- ```lua│",
+    "<CR>",
+    "- ```lua\n│",
+    options({ newline = false })
+  )
   case("reuse adjacent closer", "```lua│\n```", "<CR>body", "```lua\nbody│\n```")
   case("reuse later closer", "```lua│\nbody\n```", "<CR>", "```lua\n│\nbody\n```")
   case("reuse longer closer", "```│\n`````", "<CR>", "```\n│\n`````")
@@ -207,6 +339,59 @@ return function(h)
     feed("<C-r>")
     eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "  ```lua", "  body", "  ```" })
   end)
+  for _, prefix in ipairs({ "- ", "> ", "> - > " }) do
+    local continuation = prefix:gsub("-", " ")
+    test("fence: container undo redo and dot " .. prefix, function()
+      input(
+        "│",
+        prefix .. "```lua<CR>body",
+        prefix .. "```lua\n" .. continuation .. "body│\n" .. continuation .. "```",
+        opts,
+        "markdown"
+      )
+      local original = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+      feed("u")
+      eq(vim.api.nvim_get_current_line(), "")
+      feed("<C-r>")
+      eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), original)
+      feed("u.")
+      eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), original)
+      feed("u")
+      eq(vim.api.nvim_get_current_line(), "")
+    end)
+    case(
+      "container ignores indentexpr " .. prefix,
+      prefix .. "```lua│",
+      "<CR>body",
+      prefix .. "```lua\n" .. continuation .. "body│\n" .. continuation .. "```",
+      nil,
+      nil,
+      { indentexpr = "8", expandtab = false, tabstop = 8 }
+    )
+    case(
+      "container with native comment continuation " .. prefix,
+      prefix .. "```lua│",
+      "<CR>body",
+      prefix .. "```lua\n" .. continuation .. "body│\n" .. continuation .. "```",
+      nil,
+      nil,
+      { formatoptions = "rno", comments = "b:>,b:-", autoindent = true }
+    )
+  end
+  test("fence: quote continuation undo", function()
+    input("> ```lua│\n> ```", "<CR>body", "> ```lua\n> body│\n> ```", opts, "markdown")
+    feed("u")
+    eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "> ```lua", "> ```" })
+    feed("<C-r>")
+    eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "> ```lua", "> body", "> ```" })
+  end)
+  test("fence: container sentinel does not expand abbreviation", function()
+    vim.cmd("iabbrev x SENTINEL")
+    local ok, err =
+      pcall(input, "> ```lua│", "<CR>body", "> ```lua\n> body│\n> ```", opts, "markdown")
+    vim.cmd("iunabbrev x")
+    assert(ok, err)
+  end)
   test("fence: paste bypasses expansion", function()
     local entry = seed("```│", "markdown")
     plugin.setup(opts)
@@ -226,6 +411,18 @@ return function(h)
     eq(_G.pairs_test_result, text:gsub("│```$", "```│"))
     eq(_G.pairs_test_mode, "i")
   end)
+  for _, example in ipairs({ { "- ", "  " }, { "> ", "> " }, { "> - ", ">   " } }) do
+    local open, prefix = unpack(example)
+    test("fence: container code injection " .. open, function()
+      local entry = seed(open .. "```c\n" .. prefix .. "int x;\n" .. prefix .. "│```", "markdown")
+      plugin.setup(opts)
+      local parser = vim.treesitter.get_parser(0, "markdown")
+      parser:parse(true)
+      eq(parser:language_for_range({ 1, #prefix + 4, 1, #prefix + 4 }):lang(), "c")
+      feed(entry .. "```<Cmd>lua pairs_test_capture()<CR><Esc>")
+      eq(_G.pairs_test_result, open .. "```c\n" .. prefix .. "int x;\n" .. prefix .. "```│")
+    end)
+  end
   test("fence: injected code does not own Markdown delimiters", function()
     local entry = seed("```c\nint x;\n│```", "markdown")
     plugin.setup(opts)

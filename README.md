@@ -232,18 +232,35 @@ At the end of a new opening line, type three backticks and an optional language
 name, then press Enter. The plugin creates a blank middle line and a matching
 closing line, placing the cursor on the middle line. The language/info string
 is preserved. Content and closing indentation match the opening line, including
-its zero to three leading spaces.
+its zero to three spaces of indentation relative to any containing list/quote.
 
-An opening line with existing code content or a closing fence uses ordinary
-Enter, keeping the existing block intact. Closing fences are skipped one
+An opening line with existing code content or a closing fence inserts a single
+line, keeping the existing block intact. Within a list or quote, the new line
+receives the container's continuation prefix. Closing fences are skipped one
 backtick at a time only at parser-confirmed closing positions; longer closing
 fences are recognized. Markdown's outer block tree owns these positions even
 when the body has an injected code-language parser.
 
-The rule is opt-in and supports top-level fences with exactly three opening
-backticks. Inline code, HTML blocks, four-space indented code, longer/tilde
-openers, list/blockquote fences, and Enter within the info string keep their
+The rule is opt-in and supports exactly three opening backticks at the top level,
+inside lists and block quotes, and in nested combinations. List markers become
+continuation indentation; quote markers remain on the body and closing lines.
+For example, Enter after `> - ```lua` creates:
+
+````markdown
+> - ```lua
+>   │
+>   ```
+````
+
+The cursor marker shows the insertion position. Tabs in container prefixes
+become spaces using Markdown's four-column tab stops, independently of the
+buffer's `tabstop`/`expandtab`. Native comment continuation and `indentexpr` do
+not duplicate or change the generated prefix.
+
+Inline code, HTML blocks, four-space indented code relative to its container,
+longer/tilde openers, task-marker text, and Enter within the info string keep their
 ordinary input behavior. The rule does not enable inline backtick pairing.
+Enter within existing code content remains native buffer behavior.
 Its context checks follow [CommonMark fence syntax](https://spec.commonmark.org/0.31.2/#fenced-code-blocks).
 
 `multi_pairs["```"]` has implicit `close = "```"`; `open`, `newline` and `skip`

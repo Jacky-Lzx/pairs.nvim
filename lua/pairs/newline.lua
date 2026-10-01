@@ -58,9 +58,32 @@ function M.indent(inner)
   return M.reset(math.floor(width), inner)
 end
 
-function M.keys(indent_offset, insert_close)
+function M.prefix(prefix, inner)
+  -- Clear native indentation and comment/list continuation before restoring
+  -- the grammar-confirmed prefix. All commands remain in native redo history.
+  return (inner and "" or "x") .. code("<C-u><C-t>0<C-d>") .. prefix .. (inner and "x" or "")
+end
+
+local function prefix_keys(prefix, inner)
+  return (inner and "x" or "")
+    .. code(
+      string.format(
+        "<C-r>=luaeval(\"require('pairs.newline').prefix(_A, %s)\", %q)<CR>",
+        tostring(inner),
+        prefix
+      )
+    )
+end
+
+function M.continue(prefix)
+  return code("<CR>") .. prefix_keys(prefix, false)
+end
+
+function M.keys(indent_offset, insert_close, prefix)
   local first, last
-  if indent_offset == nil and (vim.bo.indentexpr ~= "" or vim.bo.cindent) then
+  if prefix ~= nil then
+    first, last = prefix_keys(prefix, true), prefix_keys(prefix, false)
+  elseif indent_offset == nil and (vim.bo.indentexpr ~= "" or vim.bo.cindent) then
     -- Evaluate indentation after creating each line. The returned typed
     -- whitespace is recorded for dot replay, unlike a later API edit or Ctrl-F.
     first = "x" .. code("<C-r>=luaeval(\"require('pairs.newline').indent(true)\")<CR>")
@@ -88,7 +111,7 @@ function M.keys(indent_offset, insert_close)
     .. code("<CR>")
     .. last
     .. closing
-    .. string.rep(code("<C-g>U<Left>"), #closing)
+    .. string.rep(code("<C-g>U<Left>"), #closing + (prefix and #prefix or 0))
     .. code("<C-g>U<C-Left><Del>")
 end
 

@@ -128,15 +128,36 @@ blink.cmp language completion, auto brackets and LuaSnip, plus default/minimal/
 Python startup smoke. External LSP responses remain separate acceptance work.
 Help tags, health checks, formatting and diff checks pass.
 
+## Markdown container milestone (implemented)
+
+- Recognize list/blockquote ancestors in the outer Markdown tree, including
+  nested lists, nested quotes and mixed containers.
+- Convert opening list markers to continuation indentation and preserve quote
+  markers on body/closing lines. Normalize container tabs at Markdown tab stops.
+- Reuse existing body/closers with a single Enter that supplies the continuation
+  prefix; do not create another closing fence.
+- Keep native comment leaders and indentexpr from duplicating generated prefixes.
+- Recognize closers before subsequent paragraphs and validate their indentation
+  relative to the parsed container continuation.
+- Preserve native undo/redo/dot, rule flags, unavailable/pending parser fallback,
+  and injected code boundaries. Body Enter and unsupported delimiters stay native.
+- The existing local Markdown configuration enables this extension automatically.
+
+Validation: 647 cumulative tests pass on Neovim 0.11.0 and 0.12.5; 322 pass
+without extra parser fixtures. Real configuration passes 103 input cases,
+including nested container undo/redo/dot, existing closer reuse and blink.cmp
+language completion. The configured punctuation undo breaks remain intact.
+Default/minimal/Python startup smoke, help tags, health checks, formatting and
+diff checks pass. External LSP responses remain separate acceptance work.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
    regression case before refining heuristics.
 2. Extend completion/snippet acceptance to more languages and real LSP sources,
    including auto-insert previews and semantic bracket resolution.
-3. Extend Markdown fences to list/blockquote containers and longer/tilde openers,
-   then add opt-in LaTeX rules. Evaluate ambiguous angle brackets with explicit
-   context and priority.
+3. Extend Markdown fences to longer/tilde openers, then add opt-in LaTeX rules.
+   Evaluate ambiguous angle brackets with explicit context and priority.
 4. Measure real typing latency before considering caching or incremental scans.
 5. Expand beyond Insert mode only after its behavior has settled.
 

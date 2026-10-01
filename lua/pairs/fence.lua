@@ -24,10 +24,18 @@ function M.decide(ctx, key)
       return { action = "pass", reason = "fence_opening_disabled" }
     end
     if fence.close_row then
-      return { action = "pass", reason = "fence_existing_closer" }
+      return {
+        action = fence.prefix and "continue" or "pass",
+        reason = "fence_existing_closer",
+        prefix = fence.prefix,
+      }
     end
     if fence.has_content then
-      return { action = "pass", reason = "fence_existing_content" }
+      return {
+        action = fence.prefix and "continue" or "pass",
+        reason = "fence_existing_content",
+        prefix = fence.prefix,
+      }
     end
     return {
       action = "newline",
@@ -36,6 +44,7 @@ function M.decide(ctx, key)
       close = "```",
       insert_close = true,
       indent_offset = 0,
+      prefix = fence.prefix,
     }
   end
 end

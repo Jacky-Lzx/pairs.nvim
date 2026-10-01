@@ -89,8 +89,14 @@ function M.render(result)
     return string.rep(keycode("<C-g>U<Right>"), result.move or #result.close)
   elseif result.action == "delete" then
     return string.rep(keycode("<BS>"), #result.open) .. string.rep(keycode("<Del>"), #result.close)
+  elseif result.action == "continue" then
+    return require("pairs.newline").continue(result.prefix)
   elseif result.action == "newline" then
-    return require("pairs.newline").keys(result.indent_offset, result.insert_close and result.close)
+    return require("pairs.newline").keys(
+      result.indent_offset,
+      result.insert_close and result.close,
+      result.prefix
+    )
   end
 end
 
