@@ -58,7 +58,7 @@ CI uses small fixtures and asserts behavior without timing thresholds.
 ## Measured comparison: 2026-10-01
 
 Baseline: `c58fb978cab23aef254e585c6e8884ba4faae45d`. Optimized runtime:
-this milestone's setup metadata reuse and single-scan empty-pair handling.
+`3d6f928`, with setup metadata reuse and single-scan empty-pair handling.
 Both ran the identical benchmark on Apple M5 Pro, macOS arm64, Neovim 0.12.5
 with pinned parser fixtures. Three independent alternating before/after runs
 used 3000 decision samples, 50000 lines, 20 mapped samples, plus profiling.

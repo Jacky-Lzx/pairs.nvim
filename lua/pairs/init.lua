@@ -1,6 +1,7 @@
 local M = {}
 local config
 local enabled = true
+local trace = require("pairs.trace")
 
 function M.setup(opts)
   -- Validate first so an invalid setup does not destroy a working configuration.
@@ -11,7 +12,7 @@ function M.setup(opts)
   mapping.attach(config, M.handle)
 end
 
-function M.explain(key, opts)
+local function decide(key, opts)
   if not config then
     return { action = "pass", reason = "not_initialized" }
   end
@@ -22,12 +23,23 @@ function M.explain(key, opts)
   end
   local result = require("pairs.engine").decide(ctx, key)
   result.filetype, result.syntax = ctx.filetype, ctx.syntax
-  return result
+  return result, ctx
+end
+
+function M.explain(key, opts)
+  return (decide(key, opts))
 end
 
 -- Composable expression API: nil means this plugin did not handle the key.
 function M.expr(key)
-  return require("pairs.mapping").render(M.explain(key))
+  local result, ctx = decide(key)
+  if trace.active then
+    local ok, err = pcall(trace.record, key, result, ctx, config)
+    if not ok then
+      trace.fail(err)
+    end
+  end
+  return require("pairs.mapping").render(result)
 end
 
 -- Mapping API: returns Neovim keycodes, including the original key on fallback.
@@ -60,6 +72,7 @@ function M.toggle(buf)
 end
 
 function M.teardown()
+  trace.stop()
   require("pairs.mapping").detach()
   config = nil
 end

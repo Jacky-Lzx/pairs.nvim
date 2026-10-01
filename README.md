@@ -555,6 +555,64 @@ order: preceding text may still be queued. See the
 [expression mapping documentation](https://neovim.io/doc/user/map.html#map-expression)
 for the `<Ignore>` pattern used by this plugin's mappings.
 
+## Trace a mispair
+
+After the plugin has loaded, start tracing, reproduce the unexpected behavior,
+then stop and inspect it:
+
+```vim
+PairsTrace clear
+PairsTrace start
+" Reproduce the problem while editing, then return to Normal mode.
+PairsTrace stop
+PairsTrace show
+PairsTrace export /tmp/pairs-trace.json
+```
+
+Tracing is off by default. It records calls to `expr()`/`handle()` through the
+actual mappings or a composed fallback. `explain()` and `PairsInspect` queries
+do not create records; keys handled entirely by completion/snippets do not
+create a pairing record either. There are no diagnostic reads, snapshots or
+timers on the disabled path. The trace hook does not request another parse.
+
+The newest 100 records contain the pre-edit byte cursor, local line, filetype,
+key, observed action/reason, effective delimiter policy and available syntax
+classification. A ring discards older records; the view reports the count.
+Each line snapshot is limited to 4096 bytes around the cursor, preserving valid
+UTF-8 boundaries and marking clipping. `show` opens a readonly scratch split
+without changing the source text. Stop retains records; start resumes; clear
+resets records without changing the switch. Re-setup preserves tracing;
+`teardown()` stops it and retains records. Recorder failures stop tracing and
+appear in its status/view while normal typing continues.
+
+Export is explicit and local. `PairsTrace export {file}` creates a new JSON file;
+use `PairsTrace! export {file}` to replace an existing file. Escape paths with
+spaces as for other Ex commands. Nothing is written automatically.
+JSON schema 1 uses **zero-based rows and byte columns**, and the line slice starts
+at `input.start_col`. The scratch view displays one-based positions.
+
+Exported decisions describe observed behavior. Confirm the intended output
+before turning an entry into a regression assertion. The snapshot is a starting
+point for reproduction: surrounding lines, parser trees/scheduling, language
+declarations, indentation callbacks, completion/snippets and mapping ownership
+are not serialized. Clipped lines, failed context capture and callback/runtime
+dependencies are marked in the records. A multiline/parser issue may need extra
+context added manually.
+
+The Lua API is separate from setup options:
+
+```lua
+local trace = require("pairs.trace")
+trace.clear()
+trace.start()
+-- Edit, then stop; entries() returns independent copies in chronological order.
+trace.stop()
+local records = trace.entries()
+local status = trace.status() -- active, count, capacity, dropped, optional error
+-- trace.export("/tmp/pairs-trace.json") -- explicit new-file export
+-- trace.export("/tmp/pairs-trace.json", true) -- explicit replacement
+```
+
 ## Development
 
 ```sh

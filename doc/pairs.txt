@@ -349,7 +349,61 @@ COMMANDS                                                 *pairs-commands*
 
 :PairsToggle           Toggle pairing globally.
 :PairsInspect {key}    Preview insertion before the cursor; does not edit text.
+:PairsTrace {action}   Trace actual key decisions; see |pairs-trace|.
 :checkhealth pairs     Inspect initialization and setup-time mapping conflicts.
+
+TRACE                                                    *pairs-trace*
+
+After loading the plugin, reproduce a mispair with: >vim
+    PairsTrace clear
+    PairsTrace start
+    " Edit to reproduce the unexpected behavior, then return to Normal mode.
+    PairsTrace stop
+    PairsTrace show
+    PairsTrace export /tmp/pairs-trace.json
+<
+Tracing is disabled by default. Only expr()/handle() calls record actual key
+decisions, including composed fallbacks. explain()/PairsInspect do not record.
+Completion/snippets that handle a key without calling pairs.nvim do not record.
+The disabled path performs no diagnostic reads, copies or timing. Recording
+does not request a second parse or change the returned keys.
+
+The newest 100 entries retain the pre-edit key/cursor, filetype, local line,
+observed action/reason, effective delimiter policy and available syntax state.
+Older entries are discarded and counted. Local lines are capped at 4096 bytes
+around the cursor, preserving valid UTF-8 boundaries and marking clipping.
+No entire buffer, filename or parser tree is retained.
+
+show opens a readonly scratch split. stop retains entries; start resumes;
+clear resets entries without changing the switch. Successful re-setup keeps
+tracing active. teardown stops capture without deleting retained entries.
+A recorder error stops tracing and appears in status/show; typing continues.
+
+export {file} creates a new local JSON file. Use PairsTrace! export {file} to
+replace an existing file. Escape spaces in filenames using |fnameescape()|.
+There are no automatic writes. Schema 1 records zero-based rows/byte columns;
+input.start_col is the original byte column of the captured line slice.
+The scratch view uses one-based rows/byte columns.
+
+Observed output is not an expected assertion: confirm intended behavior before
+creating a regression case. Surrounding lines, parser scheduling/trees,
+language declarations, indentation callbacks, completion/snippets and mapping
+ownership are not serialized. Clipping, missing effective rules and enabled
+callback/runtime state dependencies are marked. Add context manually when a
+multiline/parser issue requires it.
+
+Lua API: >lua
+    local trace = require('pairs.trace')
+    trace.clear()
+    trace.start()
+    -- Edit, then stop before inspecting or explicitly exporting.
+    trace.stop()
+    local entries = trace.entries() -- independent chronological copies
+    local status = trace.status() -- active/count/capacity/dropped/error
+<
+trace.export(path) creates a new JSON file; trace.export(path, true) replaces
+an existing file. show() returns its scratch buffer number. These are separate
+from setup options. The trace module does not install mappings.
 
 BENCHMARK                                                *pairs-bench*
 

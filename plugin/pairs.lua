@@ -17,3 +17,17 @@ end, {
     return { '"', "'", "(", ")", "[", "]", "{", "}", "<BS>", "<CR>" }
   end,
 })
+
+vim.api.nvim_create_user_command("PairsTrace", function(args)
+  local ok, err = pcall(require("pairs.trace").command, args.fargs, args.bang)
+  if not ok then
+    vim.notify(tostring(err), vim.log.levels.ERROR, { title = "pairs.nvim" })
+  end
+end, {
+  nargs = "+",
+  bang = true,
+  desc = "Trace actual pairing decisions and export local reproduction data",
+  complete = function(lead, line, pos)
+    return require("pairs.trace").complete(lead, line, pos)
+  end,
+})

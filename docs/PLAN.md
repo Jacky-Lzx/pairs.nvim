@@ -292,6 +292,35 @@ and diff checks pass. All 172 tracked configuration files retain their original
 bytes. Physical keyboard-to-screen latency and real LSP responses remain
 separate acceptance work.
 
+## Actual-key trace and local reproduction export milestone (implemented)
+
+- Add opt-in PairsTrace start/stop/show/clear/export commands and a separate Lua
+  API. Record only expr()/handle() decisions; explain/inspection stays query-only.
+- Retain the newest 100 chronological decisions with pre-edit input/cursor,
+  action/reason, syntax classification and copied effective delimiter policy.
+  Limit local text to 4096 bytes on valid UTF-8 boundaries and mark clipping.
+- Keep the disabled path free of diagnostic reads/copies/timers. Reuse the
+  existing context without a second parser request. Preserve native mapped
+  behavior, undo/redo/dot, completion and snippets; stop recording on hook errors.
+- Show a readonly scratch split and explicitly export JSON schema 1 with byte
+  positions, bounded input, options and reproduction limitations. Refuse existing
+  destinations without explicit replacement; remove failed new-file exports.
+- Export observations rather than expected assertions. Confirm the intended
+  output before writing a regression; surrounding text, parser state and external
+  callbacks/integrations must be supplied when needed.
+
+Validation: 1305 cumulative real-input tests pass on Neovim 0.11.0 and 0.12.5
+with pinned parser fixtures; 541 pass without fixtures. The 29 added guards
+cover capture timing, ring eviction, immutable policies, UTF-8 clipping,
+recorder/write failures, explicit overwrite, parser pending state, command
+completion, readonly views and local replay of an exported lexer case.
+The actual local configuration passes 244 existing input cases with tracing
+enabled after the first lazy-load case, including real blink.cmp and LuaSnip,
+plus ring/view/export acceptance. External LSP startup remains stubbed.
+Default/minimal/Python startup, current/minimum-version benchmarks, executable
+trace README/help examples, help tags, health, formatting and diff checks pass.
+All 172 tracked configuration files retain their original bytes.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a

@@ -1091,6 +1091,14 @@ dofile("tests/performance.lua")({
   plugin = plugin,
 })
 
+dofile("tests/trace.lua")({
+  test = test,
+  seed = seed,
+  feed = feed,
+  eq = eq,
+  plugin = plugin,
+})
+
 plugin.teardown()
 if #failures > 0 then
   io.stderr:write(table.concat(failures, "\n\n") .. "\n")
