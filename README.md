@@ -586,11 +586,36 @@ existing bracket pair when `space = true`.
 
 Exactly one space must sit on each side of the cursor for paired removal or
 Enter expansion. Manually inserted identical padding behaves the same way.
-Nonempty brackets, repeated spaces, tabs, strings, comments, escaped/unproven
-openers, pending syntax and scans beyond the budget use ordinary input.
+For Space, Backspace and Enter, nonempty brackets, repeated spaces, tabs,
+strings, comments, escaped/unproven openers, pending syntax and scans beyond
+the budget use ordinary input.
 Interpolation's structural braces retain their language rule; ordinary brackets
-inside its code expression can opt in. Closing-delimiter skipping retains its
-existing adjacent-closer rule; it does not jump across padding spaces.
+inside its code expression can opt in. Closing-delimiter skipping requires an
+adjacent closer by default. Opt into crossing one right-hand space separately:
+
+```lua
+require("pairs").setup({
+  pairs = {
+    ["("] = { space = true, skip_space = true },
+    ["["] = { space = true, skip_space = true },
+    ["{"] = { space = true, skip_space = true },
+  },
+})
+```
+
+With `skip_space = true`, `( value│ )` + `)` becomes `( value )│`; nested pairs
+work the same way. The right side must contain exactly one ASCII space followed
+immediately by the matching closer, with a proven same-line opener in the
+existing bounded scan. Multiple spaces, tabs, other intervening text, strings,
+comments, escaped/unmatched prefixes and pending syntax keep ordinary input.
+Structural interpolation closers retain their language rules.
+
+`skip_space` defaults to false and still requires `skip = true`. It is independent
+of `space`: manually entered padding also works, and enabling only `skip_space`
+does not install a Space mapping. Only `()`, `[]` and `{}` support this option.
+Global, filetype and live `b:pairs_rules` precedence remains the same. Movement
+preserves text and the existing typed-key undo/redo/dot behavior; trace exports
+include the policy and the two-position movement.
 
 The plugin installs Space only if a global/filetype rule declares `space = true`
 and `mappings.space` is true (the default). It preserves existing global and

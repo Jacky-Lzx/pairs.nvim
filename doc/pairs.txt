@@ -29,7 +29,8 @@ Options:
   filetypes            filetype -> rule/environment/enabled overrides
 
 Rules contain close (single ASCII character), open, skip, delete, and newline
-(booleans), plus space (boolean, default false; (), [] and {} only).
+(booleans), plus space and skip_space (booleans, default false;
+(), [] and {} only).
 Open/skip/delete default to true for new rules. Newline defaults
 to true for asymmetric pairs; symmetric quotes never expand. Overrides merge
 with defaults.
@@ -352,11 +353,33 @@ the existing indentexpr/cindent/fallback logic. Native undo/redo/dot are kept.
 space is independent of open; delete controls paired BS and newline controls
 paired CR. The option also handles identical manually inserted padding.
 
-Nonempty brackets, repeated spaces, tabs, strings/comments, escaped/unproven
-openers, pending syntax and over-budget scans preserve native input.
+For Space/BS/CR, nonempty brackets, repeated spaces, tabs, strings/comments,
+escaped/unproven openers, pending syntax and over-budget scans preserve native
+input.
 Structural interpolation braces retain their language rule. Ordinary brackets
-inside its expression can opt in. Closer skipping still requires an adjacent
-closer and does not cross padding spaces.
+inside its expression can opt in. Closer skipping requires an adjacent closer
+by default. To cross one right-hand space, opt in separately:
+>lua
+    require('pairs').setup({
+      pairs = {
+        ['('] = { space = true, skip_space = true },
+        ['['] = { space = true, skip_space = true },
+        ['{'] = { space = true, skip_space = true },
+      },
+    })
+<
+( value| ) + ) -> ( value )|; nested brackets work the same way.
+skip_space defaults to false, requires skip=true, and works independently of
+space. Manually entered padding also works. Enabling only skip_space does not
+map Space. Only (), [] and {} support skip_space=true.
+
+The right side must be exactly one ASCII space immediately followed by the
+matching closer. The existing bounded scan must prove a same-line opener.
+Multiple spaces, tabs, intervening text, strings/comments, escaped/unmatched
+prefixes and pending syntax keep ordinary input. Structural interpolation
+closers retain their language rules. Global/filetype/b:pairs_rules precedence
+is unchanged. Native movement preserves text, undo/redo/dot; trace exports
+include skip_space and the two-position movement.
 
 Space is mapped only if setup declares an enabled space rule globally or for
 a filetype, and mappings.space=true. Existing owners are preserved. With

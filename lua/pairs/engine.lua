@@ -129,8 +129,21 @@ function M.decide(ctx, key)
   end
   for open, candidate in pairs(ctx.rules) do
     if candidate ~= false and candidate.close == key and key ~= open then
-      if candidate.skip and next_char == key and state.stack[#state.stack] == open then
-        return decision("skip", "matching_bracket", open, key)
+      if candidate.skip and state.stack[#state.stack] == open then
+        if next_char == key then
+          return decision("skip", "matching_bracket", open, key)
+        end
+        local sub = ctx.substitution
+        if
+          candidate.skip_space
+          and next_char == " "
+          and ctx.line:sub(ctx.col + 2, ctx.col + 2) == key
+          and not (sub and ctx.row == sub.close_row and ctx.col + 1 == sub.close_col)
+        then
+          local result = decision("skip", "matching_bracket_space", open, key)
+          result.move = 2
+          return result
+        end
       end
       return decision("pass", "unmatched_bracket")
     end

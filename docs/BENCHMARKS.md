@@ -52,8 +52,9 @@ an editing baseline. Batch medians/P95 are not per-key statistics and should not
 be divided into a claimed per-key P95.
 
 The current benchmark also checks opt-in empty-space, padded Backspace/Enter
-decisions and mapped padding/deletion/Enter batches. Other scenarios keep their
-default rules; padding is not implicitly enabled for the ordinary baseline.
+and cross-space closer decisions, plus mapped padding/deletion/Enter/closer
+batches. Other scenarios keep their default rules; padding and skip_space are
+not implicitly enabled for the ordinary baseline.
 
 Neither metric measures physical keyboard-to-screen latency: these are headless
 runs without UI rendering, real completion/LSP responses or OS event delivery.

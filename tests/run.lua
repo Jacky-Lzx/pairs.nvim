@@ -1108,6 +1108,15 @@ dofile("tests/space.lua")({
   plugin = plugin,
 })
 
+dofile("tests/space_skip.lua")({
+  test = test,
+  input = input,
+  seed = seed,
+  feed = feed,
+  eq = eq,
+  plugin = plugin,
+})
+
 plugin.teardown()
 if #failures > 0 then
   io.stderr:write(table.concat(failures, "\n\n") .. "\n")

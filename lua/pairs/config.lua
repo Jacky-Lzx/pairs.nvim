@@ -64,15 +64,21 @@ local function validate_pairs(rules)
           and rule.close:byte() < 127,
         "pairs: closing delimiters must be single printable ASCII characters"
       )
-      for _, key in ipairs({ "open", "skip", "delete", "newline", "space" }) do
+      for _, key in ipairs({ "open", "skip", "delete", "newline", "space", "skip_space" }) do
         if rule[key] == nil then
-          rule[key] = key ~= "space" and (key ~= "newline" or open ~= rule.close)
+          rule[key] = key ~= "space"
+            and key ~= "skip_space"
+            and (key ~= "newline" or open ~= rule.close)
         end
         assert(type(rule[key]) == "boolean", "pairs: rule." .. key .. " must be boolean")
       end
       assert(
         not rule.space or ({ ["("] = ")", ["["] = "]", ["{"] = "}" })[open] == rule.close,
         "pairs: space padding supports (), [] and {} only"
+      )
+      assert(
+        not rule.skip_space or ({ ["("] = ")", ["["] = "]", ["{"] = "}" })[open] == rule.close,
+        "pairs: skip_space supports (), [] and {} only"
       )
       assert(not closers[rule.close], "pairs: closing delimiters must be unique")
       closers[rule.close] = open

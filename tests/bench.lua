@@ -184,12 +184,20 @@ local function decision(case)
   report.decisions[#report.decisions + 1] = result
 end
 local padding_opts = {
-  pairs = { ["("] = { space = true }, ["{"] = { space = true } },
+  pairs = { ["("] = { space = true, skip_space = true }, ["{"] = { space = true } },
 }
 local cases = {
   { name = "quote-open", key = '"', action = "pair" },
   { name = "bracket-open", key = "(", action = "pair" },
   { name = "closer-skip", line = "()", col = 1, key = ")", action = "skip" },
+  {
+    name = "padded-closer-skip",
+    line = "( value )",
+    col = 7,
+    key = ")",
+    action = "skip",
+    opts = padding_opts,
+  },
   { name = "empty-backspace", line = "()", col = 1, key = "<BS>", action = "delete" },
   { name = "empty-enter", line = "{}", col = 1, key = "<CR>", action = "newline" },
   {
@@ -447,6 +455,14 @@ mapped(
   padding_opts
 )
 mapped("mapped-padded-enter", "{ <CR>x", { "{", "  x", "}" }, false, 3, padding_opts)
+mapped(
+  "mapped-padded-closer-batch",
+  string.rep("( value)", 50) .. "z",
+  { string.rep("( value )", 50) .. "z" },
+  false,
+  150,
+  padding_opts
+)
 plugin.teardown()
 print(
   "pairs.nvim benchmark: " .. tostring(vim.version()) .. ", " .. large_lines .. " large-file lines"

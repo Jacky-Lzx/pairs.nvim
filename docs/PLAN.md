@@ -352,6 +352,35 @@ padding decision and mapped-input cases. Default/minimal/Python startup,
 executable README/help examples, help tags, health, formatting and diff checks
 pass.
 
+## Cross-space bracket exit milestone (implemented)
+
+- Add a default-off skip_space policy for (), [] and {}. Require skip=true,
+  a matching nesting stack and exactly one ASCII space immediately before the
+  right delimiter. The option is independent of space insertion and also works
+  with manual padding, without installing any additional mapping.
+- Reuse the single bounded prefix scan and existing native two-position movement.
+  Preserve text, undo/redo/dot, mapping ownership and language-specific structural
+  interpolation rules. Strings/comments, escaped/unmatched prefixes, multiple
+  spaces/tabs, intervening text and pending syntax retain ordinary input.
+- Validate global/filetype/live buffer policy, preserve setup after invalid
+  options, and export skip_space plus the movement in actual-key traces.
+  Extend mapped and decision benchmark coverage without timing thresholds.
+
+Validation: 1399 cumulative real-input tests pass on Neovim 0.11.0 and 0.12.5
+with pinned parser fixtures; 617 pass without fixtures. The 41 added cases cover
+all standard shapes, nesting, Unicode, native fallbacks, policy precedence,
+single-scan limits, mapping ownership/composition, undo/redo/dot, trace export,
+parser literals/interpolation boundaries and pending parse dispatch.
+The actual local configuration passes 257 input cases with real blink.cmp and
+LuaSnip, including completion confirmation followed by padded closer exit and
+snippet navigation. Options are changed only inside the acceptance process;
+all 172 tracked configuration files retain their original bytes. External LSP
+startup remains stubbed.
+Stable/minimum-version benchmarks pass 23 decisions and seven mapped scenarios;
+parser-free smoke passes 14 decisions and the same seven mapped scenarios.
+Default/minimal/Python startup, executable README/help examples on both versions,
+help tags, health, formatting and diff checks also pass.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
