@@ -20,7 +20,7 @@ Options:
   mappings.bs          install <BS> mapping, default true
   mappings.cr          install <CR> mapping, default true
   max_scan_bytes       maximum line prefix to scan, default 4096
-  treesitter           consult valid existing trees, default false
+  treesitter           use installed parsers for syntax context, default false
   disabled_filetypes   list of disabled filetypes
   pairs                table keyed by opening delimiter; false disables a rule
   filetypes            filetype -> { pairs = overrides, enabled = boolean }
@@ -78,10 +78,17 @@ quoted strings, not complete language grammars. Escaping uses backslash parity;
 non-ASCII neighbors conservatively block quote opening. Malformed bracket
 prefixes and scans exceeding max_scan_bytes pass through.
 
-treesitter=true consults valid existing trees without a synchronous full parse.
-Missing parsers use the fallback lexer; stale/unparsed trees pass through until
-refreshed. Enable your usual highlighter or explicitly parse the buffer first.
-Raw/multiline literal contents pass through without quote skipping/deletion.
+treesitter=true protects raw/multiline strings and block comments. Python
+f-string expressions and JavaScript/TypeScript template substitutions are code;
+format/literal text stays protected. Completed string/comment nodes are masked
+in the current line prefix before the lexer checks nesting.
+
+Stale/unparsed trees are refreshed using Neovim's time-sliced parse callback
+API. No full synchronous parse or wait is requested. Pending trees and unsafe
+incomplete literals pass keys through. Missing parsers use the line-local lexer.
+Current-line traversal is bounded to 256 nodes (syntax_limit on overflow).
+This option does not install parsers or start highlighting. See README.md for
+pinned parser fixtures used by the regression suite.
 
 Existing global mappings are preserved; buffer mappings take precedence.
 Paste, macro recording/replay, Replace mode, and special buffers bypass pairing.

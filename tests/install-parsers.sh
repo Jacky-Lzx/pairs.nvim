@@ -1,0 +1,25 @@
+#!/bin/sh
+# Build optional test fixtures from generated upstream C sources. No TS CLI needed.
+set -eu
+fixture_root=${1:?Usage: tests/install-parsers.sh /absolute/fixture/root}
+mkdir -p "$fixture_root/parser"
+build_tmp=$(mktemp -d)
+trap 'rm -rf "$build_tmp"' EXIT HUP INT TERM
+case $(uname -s) in
+  Darwin) link_flag=-dynamiclib ;;
+  *) link_flag=-shared ;;
+esac
+while read -r language revision; do
+  curl --fail --silent --show-error --location --retry 3 \
+    "https://codeload.github.com/tree-sitter/tree-sitter-$language/tar.gz/$revision" \
+    -o "$build_tmp/$language.tar.gz"
+  mkdir "$build_tmp/$language"
+  tar -xzf "$build_tmp/$language.tar.gz" -C "$build_tmp/$language" --strip-components=1
+  "${CC:-cc}" "$link_flag" -fPIC -O2 -I "$build_tmp/$language/src" \
+    "$build_tmp/$language/src/parser.c" "$build_tmp/$language/src/scanner.c" \
+    -o "$fixture_root/parser/$language.so"
+done <<'PARSERS'
+python v0.25.0
+rust 77a3747266f4d621d0757825e6b11edcbf991ca5
+javascript 58404d8cf191d69f2674a8fd507bd5776f46cb11
+PARSERS

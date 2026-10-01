@@ -24,57 +24,6 @@ local comments = {
   cs = { "//" },
 }
 
-local function syntax_at(buf, row, col)
-  local parser_ok, parser = pcall(vim.treesitter.get_parser, buf)
-  if not parser_ok or not parser then
-    return nil
-  end
-  -- Do not force an unbounded synchronous parse on the input path, or trust an
-  -- old tree after an edit. An active highlighter normally refreshes this tree.
-  local range = { row, math.max(col - 1, 0), row, math.max(col - 1, 0) }
-  local language = parser:language_for_range(range)
-  if not parser:is_valid(true) or not language:is_valid(true) then
-    return "unknown"
-  end
-  local ok, node = pcall(vim.treesitter.get_node, {
-    bufnr = buf,
-    pos = { row, math.max(col - 1, 0) },
-    ignore_injections = false,
-  })
-  if not ok or not node then
-    return nil
-  end
-  local string_context
-  while node do
-    local kind = node:type()
-    local start_row, start_col, end_row, end_col = node:range()
-    -- An insertion immediately after a completed node is outside that node.
-    local inside = row < end_row or (row == end_row and col < end_col)
-    if inside and kind:find("comment") then
-      return "comment"
-    end
-    if
-      inside and (kind:find("string") or kind == "char_literal" or kind == "character_literal")
-    then
-      string_context = "string"
-      -- Quotes in a raw/multiline literal are literal text, even when a
-      -- line-local scan happens to see an apparently balanced quoted string.
-      if kind == "string" or kind:find("literal") or kind == "template_string" then
-        local start_line = vim.api.nvim_buf_get_lines(buf, start_row, start_row + 1, false)[1] or ""
-        local opening = start_line:sub(start_col + 1, start_col + 1)
-        local literal = start_row ~= row
-          or end_row ~= row
-          or opening == "["
-          or kind:find("raw") ~= nil
-          or kind == "template_string"
-        return "string", literal
-      end
-    end
-    node = node:parent()
-  end
-  return string_context
-end
-
 function M.capture(config, global_enabled, assume_insert)
   local buf = vim.api.nvim_get_current_buf()
   local cursor = vim.api.nvim_win_get_cursor(0)
@@ -136,7 +85,10 @@ function M.capture(config, global_enabled, assume_insert)
     },
   }
   if enabled and config.treesitter and #ctx.line <= config.max_scan_bytes then
-    ctx.syntax, ctx.literal_string = syntax_at(buf, cursor[1] - 1, cursor[2])
+    local syntax = require("pairs.syntax").capture(buf, cursor[1] - 1, cursor[2], ctx.line)
+    for key, value in pairs(syntax) do
+      ctx[key] = value
+    end
   end
   return ctx
 end

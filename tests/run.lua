@@ -493,6 +493,210 @@ test("stale parser tree preserves input", function()
   eq(_G.pairs_test_result, 'local s = ""│a"')
 end)
 
+local syntax_cases = {
+  { "line comment at EOL", "-- words │", '"', '-- words "│', "lua" },
+  { "C line comment at EOL", "// words │", '"', '// words "│', "c" },
+  { "incomplete block comment", "/* words │", '"', '/* words "│', "c" },
+  { "incomplete quoted string", 'local s = "words │', '"', 'local s = "words "│', "lua" },
+  { "continuous quote input", "│", '("body")', '("body")│', "lua" },
+  { "continuous Enter expansion", "│", "{<CR>body", "{\n  body│\n}", "lua" },
+  {
+    "code after a long string",
+    'local s = [[" { ]] ; │',
+    '"',
+    'local s = [[" { ]] ; "│"',
+    "lua",
+  },
+  {
+    "code after multiline string",
+    'local s = [[\n" {\n]]; │',
+    '"',
+    'local s = [[\n" {\n]]; "│"',
+    "lua",
+  },
+  {
+    "long string contents at EOL",
+    "local s = [=[\nbody │\n]=]",
+    '"',
+    'local s = [=[\nbody "│\n]=]',
+    "lua",
+  },
+  { "block comment contents", "/*\n│\n*/", '"', '/*\n"│\n*/', "c" },
+  { "after a block comment", '/* " { */ │', '"', '/* " { */ "│"', "c" },
+  { "bracket stack around a string", 'fn("x"│)', ")", 'fn("x")│', "c" },
+}
+if vim.env.PAIRS_TEST_PARSER_ROOT then
+  vim.list_extend(syntax_cases, {
+    { "Python conversion suffix", 's = f"{x!r│}"', "(", 's = f"{x!r(│}"', "python" },
+    { "incomplete Python triple string", 's = """words │', '"', 's = """words "│', "python" },
+    {
+      "incomplete JavaScript template",
+      "const s = `words │",
+      '"',
+      'const s = `words "│',
+      "javascript",
+    },
+    { "Python triple double quotes", 's = """\n│\n"""', '"', 's = """\n"│\n"""', "python" },
+    { "Python triple single quotes", "s = '''\n│\n'''", "'", "s = '''\n'│\n'''", "python" },
+    { "Python single-line triple string", 's = """│"""', '"', 's = """"│"""', "python" },
+    { "Python prefixed quote closer", "s = r'body│'", "'", "s = r'body'│", "python" },
+    {
+      "Python f-string contents",
+      's = f"hello │{name}"',
+      '"',
+      's = f"hello "│{name}"',
+      "python",
+    },
+    { "Python f-string expression", 's = f"{fn(│)}"', '"', 's = f"{fn("│")}"', "python" },
+    {
+      "Python f-string expression closing",
+      's = f"{fn("body│")}"',
+      '"',
+      's = f"{fn("body"│)}"',
+      "python",
+    },
+    { "Python empty f-string expression", 's = f"{│}"', '"', 's = f"{"│"}"', "python" },
+    { "Python format specifier text", 's = f"{x:│}"', '"', 's = f"{x:"│}"', "python" },
+    {
+      "Python nested format expression",
+      's = f"{x:{fn(│)}}"',
+      '"',
+      's = f"{x:{fn("│")}}"',
+      "python",
+    },
+    {
+      "Python after triple string",
+      's = """\n" {\n"""; │',
+      '"',
+      's = """\n" {\n"""; "│"',
+      "python",
+    },
+    { "Rust raw string contents", 'let s = r##"│"##;', '"', 'let s = r##""│"##;', "rust" },
+    {
+      "Rust raw string internal quote",
+      'let s = r##"a "│" b"##;',
+      '"',
+      'let s = r##"a ""│" b"##;',
+      "rust",
+    },
+    { "Rust raw string deletion", 'let s = r##""│""##;', "<BS>", 'let s = r##"│""##;', "rust" },
+    { "Rust raw string Enter", 'let s = r##"{│}"##;', "<CR>", 'let s = r##"{\n│}"##;', "rust" },
+    {
+      "Rust after raw string",
+      'let s = r##" " { "##; │',
+      '"',
+      'let s = r##" " { "##; "│"',
+      "rust",
+    },
+    {
+      "JavaScript template contents",
+      "const s = `hello │${name}`;",
+      '"',
+      'const s = `hello "│${name}`;',
+      "javascript",
+    },
+    {
+      "JavaScript template expression",
+      "const s = `${fn(│)}`;",
+      '"',
+      'const s = `${fn("│")}`;',
+      "javascript",
+    },
+    {
+      "JavaScript template quote closer",
+      'const s = `${fn("body│")}`;',
+      '"',
+      'const s = `${fn("body"│)}`;',
+      "javascript",
+    },
+    {
+      "JavaScript empty template expression",
+      "const s = `${│}`;",
+      '"',
+      'const s = `${"│"}`;',
+      "javascript",
+    },
+    {
+      "JavaScript template expression brackets",
+      "const s = `${fn(│)}`;",
+      "{<CR>body",
+      "const s = `${fn({\n  body│\n})}`;",
+      "javascript",
+    },
+    {
+      "JavaScript template comment",
+      "const s = `${/* │ */ value}`;",
+      '"',
+      'const s = `${/* "│ */ value}`;',
+      "javascript",
+    },
+    {
+      "JavaScript after template string",
+      'const s = `" {`; │',
+      '"',
+      'const s = `" {`; "│"',
+      "javascript",
+    },
+  })
+end
+for _, case in ipairs(syntax_cases) do
+  test("syntax: " .. case[1], function()
+    input(case[2], case[3], case[4], { treesitter = true }, case[5])
+  end)
+end
+
+test("syntax: forced sync parsing is never requested", function()
+  local entry = seed("local s = [[\n│\n]]")
+  plugin.setup({ treesitter = true })
+  local previous = vim.g._ts_force_sync_parsing
+  vim.g._ts_force_sync_parsing = true
+  local ok, err = pcall(function()
+    eq(plugin.explain('"', { assume_insert = true }).reason, "syntax_pending")
+    feed(entry .. '"<Cmd>lua pairs_test_capture()<CR><Esc>')
+    eq(_G.pairs_test_result, 'local s = [[\n"│\n]]')
+  end)
+  vim.g._ts_force_sync_parsing = previous
+  assert(ok, err)
+end)
+
+test("syntax: unfinished asynchronous parse preserves input", function()
+  local entry = seed("local s = [[\n│\n]]")
+  plugin.setup({ treesitter = true })
+  local parser = vim.treesitter.get_parser(0, "lua")
+  local original = parser.parse
+  local calls = 0
+  parser.parse = function(_, range, on_parse)
+    calls = calls + 1
+    eq(type(range), "table")
+    eq(type(on_parse), "function")
+    return nil
+  end
+  local ok, err = pcall(function()
+    eq(plugin.explain('"', { assume_insert = true }).reason, "syntax_pending")
+    feed(entry .. '"<Cmd>lua pairs_test_capture()<CR><Esc>')
+    eq(_G.pairs_test_result, 'local s = [[\n"│\n]]')
+    assert(calls > 0)
+  end)
+  parser.parse = original
+  assert(ok, err)
+end)
+
+test("syntax: incomplete literal has a diagnostic reason", function()
+  seed("/* words │", "c")
+  plugin.setup({ treesitter = true })
+  eq(plugin.explain('"', { assume_insert = true }).reason, "syntax_incomplete")
+end)
+
+test("syntax: complex line traversal is bounded", function()
+  local before = "local x = {" .. string.rep("a,", 300) .. "}; "
+  local entry = seed(before .. "│")
+  plugin.setup({ treesitter = true })
+  vim.treesitter.get_parser(0, "lua"):parse()
+  eq(plugin.explain('"', { assume_insert = true }).reason, "syntax_limit")
+  feed(entry .. '"<Cmd>lua pairs_test_capture()<CR><Esc>')
+  eq(_G.pairs_test_result, before .. '"│')
+end)
+
 test("completion-provided brackets are not duplicated", function()
   local entry = seed("│")
   plugin.setup()

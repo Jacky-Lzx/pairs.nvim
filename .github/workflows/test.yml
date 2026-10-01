@@ -13,7 +13,10 @@ jobs:
         with:
           version: ${{ matrix.version }}
           neovim: true
+      - run: ./tests/install-parsers.sh "$RUNNER_TEMP/pairs-parsers"
       - run: ./tests/run.sh
+        env:
+          PAIRS_TEST_PARSER_ROOT: ${{ runner.temp }}/pairs-parsers
 
   format:
     runs-on: ubuntu-latest

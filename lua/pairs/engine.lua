@@ -27,9 +27,13 @@ function M.decide(ctx, key)
     return decision("pass", ctx.disabled_reason or "disabled")
   end
   if ctx.syntax == "unknown" or ctx.literal_string then
-    return decision("pass", ctx.literal_string and "literal_string" or "syntax_pending")
+    return decision(
+      "pass",
+      ctx.literal_string and "literal_string" or ctx.syntax_reason or "syntax_pending"
+    )
   end
-  local state = lex.scan(ctx.line, ctx.col, ctx.lex)
+  local scan_line = ctx.lex_line or ctx.line
+  local state = lex.scan(scan_line, ctx.col, ctx.lex)
   if state.uncertain then
     return decision("pass", state.reason)
   end
@@ -43,7 +47,7 @@ function M.decide(ctx, key)
     if not rule or rule == false or next_char ~= rule.close then
       return decision("pass", "not_empty_pair")
     end
-    local before = lex.scan(ctx.line, ctx.col - #prev, ctx.lex)
+    local before = lex.scan(scan_line, ctx.col - #prev, ctx.lex)
     if
       before.uncertain
       or before.comment
@@ -75,8 +79,12 @@ function M.decide(ctx, key)
   end
   local rule = ctx.rules[key]
   if rule and rule ~= false and key == rule.close then
-    if state.quote == key then
-      if next_char == key and rule.skip then
+    if state.quote == key or (ctx.syntax == "string" and ctx.string_quote == key) then
+      if
+        next_char == key
+        and rule.skip
+        and (ctx.syntax ~= "string" or ctx.string_close == nil or ctx.string_close == ctx.col)
+      then
         return decision("skip", "matching_quote", key, key)
       end
       return decision("pass", "closing_quote")

@@ -53,8 +53,8 @@ Requiring the module alone does not install mappings.
   through without adding another closing quote.
 - Escaping uses the parity of consecutive backslashes, not just the preceding
   character.
-- Closing quotes are skipped only when the line-local lexer finds a matching
-  opening quote. Bracket skipping also checks nesting, not delimiter counts.
+- Closing quotes are skipped only when the lexer or syntax context identifies
+  a matching opening quote. Bracket skipping also checks nesting, not delimiter counts.
 - Single-quote opening is disabled by default for `text`, `markdown`, and
   `rust`. Single-quote skipping/deletion remain separate options.
 - Common line comments are recognized by filetype. A string/comment suppresses
@@ -101,12 +101,21 @@ vim.b.pairs_rules = { ['"'] = { open = false } }
 Buffer rules can override existing rules. A newly introduced delimiter requires
 its own mapping via `handle()` or a global/filetype declaration at setup time.
 
-Enable `treesitter = true` to consult an already valid parser tree for string
-and comment context, including raw/multiline strings. It does not install
-parsers or synchronously parse the entire buffer. Missing parsers fall back to
-the line-local lexer; a stale/unparsed tree conservatively passes keys through
-until the parser is refreshed. Enable your normal Tree-sitter highlighter or
-explicitly parse the buffer to provide that context.
+Enable `treesitter = true` to recognize multiline strings, raw strings and
+block comments using an installed parser. Python f-string expressions and
+JavaScript/TypeScript template substitutions are treated as code; their literal
+text stays protected. Completed strings/comments are masked in the current
+line's lexical prefix so their contents cannot corrupt later bracket nesting.
+Normal quoted strings still support skipping their closing quote.
+
+The plugin refreshes stale or unparsed trees through Neovim's time-sliced
+`parse(range, callback)` API. It never requests a full synchronous parse or
+waits for completion. If the required tree is still pending, or an unfinished
+literal cannot be classified safely, the original key passes through. Missing
+parsers use the line-local lexer. Current-line syntax traversal is limited to
+256 nodes; more complex prefixes pass through with reason `syntax_limit`.
+This option does not install parsers or start
+highlighting; your usual Tree-sitter highlighter can share the same parser.
 
 Without syntax context, the lexer is intentionally line-local. It does not
 fully understand multiline strings, block comments, interpolation, injected
@@ -178,12 +187,18 @@ and replay, Replace mode, and special buffers bypass pairing.
 ```sh
 ./tests/run.sh
 stylua --check lua tests plugin
+
+# Also exercise actual Python/Rust/JavaScript grammars:
+./tests/install-parsers.sh /tmp/pairs-parsers
+PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers ./tests/run.sh
 ```
 
 Tests use actual Neovim input and cursor positions in isolated XDG directories.
 They cover quotes, nesting, UTF-8 neighbors, backspace, Enter/indentation,
 undo/redo, dot repeat,
-configuration precedence, optional Tree-sitter, completion/snippet-style buffer
-edits, macro/paste behavior, and mapping lifecycle. CI checks the minimum
-supported version and the current stable version. Real blink.cmp/LuaSnip
+configuration precedence, Tree-sitter literal/interpolation boundaries and
+pending parses, completion/snippet-style buffer edits, macro/paste behavior,
+and mapping lifecycle. CI checks the minimum
+supported version and the current stable version, with pinned parser fixtures.
+Parser fixtures are test-only and do not change your installed parsers. Real blink.cmp/LuaSnip
 integration remains a separate manual acceptance check.

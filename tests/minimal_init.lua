@@ -7,3 +7,8 @@ vim.o.shiftwidth = 2
 vim.o.tabstop = 4
 vim.o.showmode = false
 vim.o.report = 9999
+
+-- Optional pinned parser fixtures for Python, Rust and JavaScript coverage.
+if vim.env.PAIRS_TEST_PARSER_ROOT then
+  vim.opt.runtimepath:append(vim.env.PAIRS_TEST_PARSER_ROOT)
+end
