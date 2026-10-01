@@ -183,12 +183,39 @@ local function decision(case)
   end
   report.decisions[#report.decisions + 1] = result
 end
+local padding_opts = {
+  pairs = { ["("] = { space = true }, ["{"] = { space = true } },
+}
 local cases = {
   { name = "quote-open", key = '"', action = "pair" },
   { name = "bracket-open", key = "(", action = "pair" },
   { name = "closer-skip", line = "()", col = 1, key = ")", action = "skip" },
   { name = "empty-backspace", line = "()", col = 1, key = "<BS>", action = "delete" },
   { name = "empty-enter", line = "{}", col = 1, key = "<CR>", action = "newline" },
+  {
+    name = "empty-space",
+    line = "()",
+    col = 1,
+    key = "<Space>",
+    action = "pair",
+    opts = padding_opts,
+  },
+  {
+    name = "padded-backspace",
+    line = "(  )",
+    col = 2,
+    key = "<BS>",
+    action = "delete",
+    opts = padding_opts,
+  },
+  {
+    name = "padded-enter",
+    line = "{  }",
+    col = 2,
+    key = "<CR>",
+    action = "newline",
+    opts = padding_opts,
+  },
   { name = "buffer-override", key = '"', action = "pass", buffer = { ['"'] = { open = false } } },
   {
     name = "long-prefix-2k",
@@ -356,8 +383,8 @@ end
 local function feed(keys)
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, true, true), "xt", false)
 end
-local function mapped(name, keys, expected, native, owned_keys)
-  reset({ "" }, 1, 0, "lua", {})
+local function mapped(name, keys, expected, native, owned_keys, opts)
+  reset({ "" }, 1, 0, "lua", opts or {})
   if native then
     plugin.teardown()
   end
@@ -411,6 +438,15 @@ mapped("native-balanced-batch", stream, { stream }, true, 0)
 mapped("mapped-balanced-batch", stream, { stream }, false, 300)
 mapped("mapped-backspace-batch", string.rep('(<BS>[<BS>{<BS>"<BS>', 50) .. "z", { "z" }, false, 400)
 mapped("mapped-enter", "{<CR>x", { "{", "  x", "}" }, false, 2)
+mapped(
+  "mapped-padding-batch",
+  string.rep("( <BS><BS>", 50) .. "z",
+  { "z" },
+  false,
+  200,
+  padding_opts
+)
+mapped("mapped-padded-enter", "{ <CR>x", { "{", "  x", "}" }, false, 3, padding_opts)
 plugin.teardown()
 print(
   "pairs.nvim benchmark: " .. tostring(vim.version()) .. ", " .. large_lines .. " large-file lines"

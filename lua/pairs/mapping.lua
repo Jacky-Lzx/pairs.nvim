@@ -35,6 +35,9 @@ function M.attach(config, handler)
     for open, rule in pairs(rules) do
       if rule ~= false then
         keys[open], keys[rule.close] = true, true
+        if rule.space and config.mappings.space then
+          keys[" "] = true
+        end
       end
     end
   end
@@ -60,14 +63,15 @@ function M.attach(config, handler)
   if config.mappings.cr then
     keys["<CR>"] = true
   end
-  for _, lhs in ipairs(vim.tbl_keys(keys)) do
+  for _, key in ipairs(vim.tbl_keys(keys)) do
+    local lhs = key == " " and "<Space>" or key
     local bytes = { lhs:byte(1, #lhs) }
     local plug = "<Plug>(pairs.nvim-" .. table.concat(bytes, "-") .. ")"
     if global_mapping(lhs) or global_mapping(plug) then
       M.conflicts[#M.conflicts + 1] = lhs
     else
       local callback = function()
-        return handler(lhs)
+        return handler(key)
       end
       vim.keymap.set("i", plug, callback, {
         expr = true,
@@ -95,11 +99,12 @@ function M.render(result)
   elseif result.action == "continue" then
     return require("pairs.newline").continue(result.prefix)
   elseif result.action == "newline" then
-    return require("pairs.newline").keys(
-      result.indent_offset,
-      result.insert_close and result.close,
-      result.prefix
-    )
+    return (result.trim_space and keycode("<BS><Del>") or "")
+      .. require("pairs.newline").keys(
+        result.indent_offset,
+        result.insert_close and result.close,
+        result.prefix
+      )
   end
 end
 

@@ -19,6 +19,7 @@ Options:
   mappings.enabled     install mappings, default true
   mappings.bs          install <BS> mapping, default true
   mappings.cr          install <CR> mapping, default true
+  mappings.space       allow opt-in Space mapping, default true
   max_scan_bytes       maximum line prefix to scan, default 4096
   treesitter           use installed parsers for syntax context, default false
   disabled_filetypes   list of disabled filetypes
@@ -28,7 +29,8 @@ Options:
   filetypes            filetype -> rule/environment/enabled overrides
 
 Rules contain close (single ASCII character), open, skip, delete, and newline
-(booleans). Open/skip/delete default to true for new rules. Newline defaults
+(booleans), plus space (boolean, default false; (), [] and {} only).
+Open/skip/delete default to true for new rules. Newline defaults
 to true for asymmetric pairs; symmetric quotes never expand. Overrides merge
 with defaults.
 Closing delimiters must be unique. Multi-character rules use multi_pairs.
@@ -325,6 +327,44 @@ dot replays the resulting indentation from the original insertion.
 Existing Enter mappings are preserved. For a completion-owned Enter, set
 mappings.cr=false and compose expr('<CR>') after completion confirmation and
 before the owner's native fallback. See the blink.cmp example in README.md.
+
+SPACE PADDING                                            *pairs-space*
+
+Padding is disabled by default. Enable it per standard bracket rule: >lua
+    require('pairs').setup({
+      pairs = {
+        ['('] = { space = true },
+        ['['] = { space = true },
+        ['{'] = { space = true },
+      },
+    })
+<
+Here | marks the insertion cursor:
+  (|)   + Space -> ( | )
+  [|]   + Space -> [ | ]
+  { | } + BS    -> {|}
+  { | } + CR    -> opening line, indented middle line, closing line
+
+Only adjacent empty brackets add two ASCII spaces. Paired BS/CR requires
+exactly one space on each side of the cursor. BS retains the delimiters;
+another BS can remove the remaining empty pair. CR trims the padding before
+the existing indentexpr/cindent/fallback logic. Native undo/redo/dot are kept.
+space is independent of open; delete controls paired BS and newline controls
+paired CR. The option also handles identical manually inserted padding.
+
+Nonempty brackets, repeated spaces, tabs, strings/comments, escaped/unproven
+openers, pending syntax and over-budget scans preserve native input.
+Structural interpolation braces retain their language rule. Ordinary brackets
+inside its expression can opt in. Closer skipping still requires an adjacent
+closer and does not cross padding spaces.
+
+Space is mapped only if setup declares an enabled space rule globally or for
+a filetype, and mappings.space=true. Existing owners are preserved. With
+mappings.space=false, compose expr('<Space>') before the owner's fallback.
+The API also accepts a literal space. Enter composition remains expr('<CR>').
+Overrides follow global/filetype/buffer precedence. Buffer-only activation
+needs an existing setup-declared Space mapping or a composed owner mapping.
+Only (), [] and {} support space=true; quotes/multi-character pairs do not.
 
 API                                                      *pairs-api*
 

@@ -321,6 +321,37 @@ Default/minimal/Python startup, current/minimum-version benchmarks, executable
 trace README/help examples, help tags, health, formatting and diff checks pass.
 All 172 tracked configuration files retain their original bytes.
 
+## Empty-bracket space padding milestone (implemented)
+
+- Add opt-in space policies for (), [] and {} with validated global/filetype/
+  buffer overrides. Default rules leave Space unmapped. Preserve existing Space
+  owners and support composition with expr('<Space>') or a literal space.
+- Insert one space per side in an adjacent empty pair. For exactly symmetric
+  single-space padding, BS removes only the spaces and CR trims them before
+  existing indentation. Respect independent delete/newline flags and retain
+  typed-key undo/redo/dot behavior.
+- Reuse the existing bounded lexer snapshot; no extra prefix scan, parser call
+  or retained buffer state. Strings/comments, unsafe/pending syntax, escaped
+  openers, nonempty/extra whitespace and structural interpolation boundaries
+  retain ordinary input. Closer skipping retains its adjacent-closer rule.
+- Copy the validated space policy and trim_space decision into trace exports;
+  inspect queries accept <Space>. No local configuration option is changed.
+
+Validation: 1358 cumulative real-input tests pass on Neovim 0.11.0 and 0.12.5
+with pinned parser fixtures; 585 pass without fixtures. Added cases cover
+exact whitespace, disabled policies, native fallbacks, single-scan limits,
+mapping ownership/composition, tabs/indentexpr, undo/redo/dot, trace export and
+parser/literal/interpolation boundaries. The actual local configuration passes
+250 input cases, including six new padding cases with completion-owned Enter,
+real blink.cmp/LuaSnip confirmation/navigation and native undo/redo/dot. Padding
+is enabled only in the acceptance process and the original options are restored.
+External LSP startup remains stubbed. All 172 tracked configuration files retain
+their original bytes.
+Current/minimum-version and parser-free benchmark runs also pass the added
+padding decision and mapped-input cases. Default/minimal/Python startup,
+executable README/help examples, help tags, health, formatting and diff checks
+pass.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a

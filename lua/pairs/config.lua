@@ -4,7 +4,9 @@ local prepared = setmetatable({}, { __mode = "k" })
 
 local function prepare(rules, multi_rules)
   local openers, closers, quotes = {}, {}, { ['"'] = true, ["'"] = true }
+  local has_space = false
   for open, rule in pairs(rules) do
+    has_space = has_space or (rule ~= false and rule.space)
     if rule ~= false and open ~= rule.close then
       openers[open], closers[rule.close] = rule.close, open
     elseif rule ~= false then
@@ -19,12 +21,13 @@ local function prepare(rules, multi_rules)
     closers = closers,
     quotes = quotes,
     tick_quotes = tick_quotes,
+    has_space = has_space,
   }
 end
 
 M.defaults = {
   enabled = true,
-  mappings = { enabled = true, bs = true, cr = true },
+  mappings = { enabled = true, bs = true, cr = true, space = true },
   max_scan_bytes = 4096,
   treesitter = false,
   disabled_filetypes = { "TelescopePrompt", "snacks_picker_input" },
@@ -61,12 +64,16 @@ local function validate_pairs(rules)
           and rule.close:byte() < 127,
         "pairs: closing delimiters must be single printable ASCII characters"
       )
-      for _, key in ipairs({ "open", "skip", "delete", "newline" }) do
+      for _, key in ipairs({ "open", "skip", "delete", "newline", "space" }) do
         if rule[key] == nil then
-          rule[key] = key ~= "newline" or open ~= rule.close
+          rule[key] = key ~= "space" and (key ~= "newline" or open ~= rule.close)
         end
         assert(type(rule[key]) == "boolean", "pairs: rule." .. key .. " must be boolean")
       end
+      assert(
+        not rule.space or ({ ["("] = ")", ["["] = "]", ["{"] = "}" })[open] == rule.close,
+        "pairs: space padding supports (), [] and {} only"
+      )
       assert(not closers[rule.close], "pairs: closing delimiters must be unique")
       closers[rule.close] = open
     end
@@ -143,7 +150,7 @@ function M.build(opts)
   )
   assert(type(config.treesitter) == "boolean", "pairs: treesitter must be boolean")
   assert(type(config.mappings) == "table", "pairs: mappings must be a table")
-  for _, key in ipairs({ "enabled", "bs", "cr" }) do
+  for _, key in ipairs({ "enabled", "bs", "cr", "space" }) do
     assert(type(config.mappings[key]) == "boolean", "pairs: mappings." .. key .. " must be boolean")
   end
   assert(type(config.disabled_filetypes) == "table", "pairs: disabled_filetypes must be a list")

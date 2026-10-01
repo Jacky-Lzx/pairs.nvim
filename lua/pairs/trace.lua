@@ -32,7 +32,7 @@ local function local_line(line, col)
   }
 end
 
-local function rules_copy(rules)
+local function rules_copy(rules, single)
   local copy = {}
   for open, rule in pairs(rules or {}) do
     if rule == false then
@@ -46,6 +46,9 @@ local function rules_copy(rules)
         delete = rule.delete,
         newline = rule.newline,
       }
+      if single then
+        copy[open].space = rule.space
+      end
     end
   end
   return copy
@@ -106,6 +109,7 @@ function M.record(key, result, ctx, config)
     "insert_close",
     "prefix",
     "error",
+    "trim_space",
   }) do
     local value = result[name]
     if type(value) == "string" then
@@ -171,7 +175,7 @@ function M.record(key, result, ctx, config)
       treesitter = config.treesitter,
       max_scan_bytes = config.max_scan_bytes,
       filetypes = {
-        [ft] = { pairs = rules_copy(ctx.rules), multi_pairs = rules_copy(ctx.multi_rules) },
+        [ft] = { pairs = rules_copy(ctx.rules, true), multi_pairs = rules_copy(ctx.multi_rules) },
       },
     }
   end

@@ -11,6 +11,9 @@ end
 
 -- The engine consumes a snapshot; all Neovim interaction belongs to the adapter.
 function M.decide(ctx, key)
+  if key == "<Space>" then
+    key = " "
+  end
   if not ctx.enabled then
     return decision("pass", ctx.disabled_reason or "disabled")
   end
@@ -44,6 +47,12 @@ function M.decide(ctx, key)
   end
   if state.comment or ctx.syntax == "comment" then
     return decision("pass", "comment")
+  end
+  if ctx.has_space and (key == " " or empty_key) then
+    local padding = require("pairs.padding").decide(ctx, key, state)
+    if padding then
+      return padding
+    end
   end
   local prev, next_char = lex.previous(ctx.line, ctx.col), lex.next(ctx.line, ctx.col)
 

@@ -555,6 +555,53 @@ order: preceding text may still be queued. See the
 [expression mapping documentation](https://neovim.io/doc/user/map.html#map-expression)
 for the `<Ignore>` pattern used by this plugin's mappings.
 
+## Empty-bracket space padding
+
+Padding is disabled by default. Enable it independently for `()`, `[]` or `{}`:
+
+```lua
+require("pairs").setup({
+  pairs = {
+    ["("] = { space = true },
+    ["["] = { space = true },
+    ["{"] = { space = true },
+  },
+})
+```
+
+| Before | Input | After |
+| --- | --- | --- |
+| `(│)` | Space | `( │ )` |
+| `[│]` | Space | `[ │ ]` |
+| `{ │ }` | `<BS>` | `{│}` |
+| `{ │ }` | `<CR>` | `{` + indented middle line + `}` |
+
+Space adds one ASCII space on each side only between adjacent empty brackets.
+Backspace removes those two spaces, retaining the brackets; a second Backspace
+can remove the remaining empty pair. Enter removes the padding before applying
+the existing indentation logic. Undo/redo and dot repeat preserve the insertion.
+`space` defaults to false, while `delete` and `newline` retain their independent
+control over Backspace and Enter. `open = false` still permits padding of an
+existing bracket pair when `space = true`.
+
+Exactly one space must sit on each side of the cursor for paired removal or
+Enter expansion. Manually inserted identical padding behaves the same way.
+Nonempty brackets, repeated spaces, tabs, strings, comments, escaped/unproven
+openers, pending syntax and scans beyond the budget use ordinary input.
+Interpolation's structural braces retain their language rule; ordinary brackets
+inside its code expression can opt in. Closing-delimiter skipping retains its
+existing adjacent-closer rule; it does not jump across padding spaces.
+
+The plugin installs Space only if a global/filetype rule declares `space = true`
+and `mappings.space` is true (the default). It preserves existing global and
+buffer mappings. Set `mappings.space = false` for a Space mapping owned elsewhere
+and compose `expr("<Space>")` before that owner's native fallback. A literal
+`" "` works with the API too. Enter composition continues to use `expr("<CR>")`.
+Filetype/buffer overrides follow the usual precedence and stay live. A buffer-only
+activation requires a Space mapping already declared at setup or explicitly
+composed by its owner. The first version supports the standard bracket shapes
+only; quote/multi-character padding is not enabled by this option.
+
 ## Trace a mispair
 
 After the plugin has loaded, start tracing, reproduce the unexpected behavior,

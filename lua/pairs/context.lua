@@ -73,6 +73,7 @@ function M.capture(config, global_enabled, assume_insert)
     enabled = enabled,
     disabled_reason = reason,
     rules = resolved.rules,
+    has_space = resolved.has_space,
     multi_rules = multi_rules,
     row = cursor[1] - 1,
     lex = {
