@@ -564,6 +564,10 @@ stylua --check lua tests plugin
 # Also exercise actual Python/Rust/JavaScript/TypeScript/TSX/LaTeX grammars:
 ./tests/install-parsers.sh /tmp/pairs-parsers
 PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers ./tests/run.sh
+
+# Decision timing and actual mapped input batches (isolated, headless):
+PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers \
+  PAIRS_BENCH_OUTPUT=/tmp/pairs-benchmark.json ./tests/bench.sh
 ```
 
 Tests use actual Neovim input and cursor positions in isolated XDG directories.
@@ -578,3 +582,13 @@ and mapping lifecycle. CI checks the minimum
 supported version and the current stable version, with pinned parser fixtures.
 Parser fixtures are test-only and do not change your installed parsers. Real blink.cmp/LuaSnip
 integration remains a separate manual acceptance check.
+
+The benchmark reports decision median/P95/max in microseconds and separately
+times input batches that edit buffers through the actual mappings. It also checks
+the resulting text, undo/redo and dot repeat. `PAIRS_BENCH_SAMPLES` defaults to
+1000; `PAIRS_BENCH_LINES` to 50000; `PAIRS_BENCH_MAPPED_SAMPLES` to 20.
+Use `PAIRS_BENCH_PROFILE=1` for an additional instrumented stage breakdown.
+No parser fixtures are required for the lexer and mapped-input cases.
+These measurements exclude screen rendering and physical keyboard latency;
+CI checks behavior without a machine-dependent timing threshold.
+See [benchmark methods and measured results](docs/BENCHMARKS.md).

@@ -1,4 +1,26 @@
 local M = {}
+-- Only setup-owned metadata is shared. Buffer overrides are never cached.
+local prepared = setmetatable({}, { __mode = "k" })
+
+local function prepare(rules, multi_rules)
+  local openers, closers, quotes = {}, {}, { ['"'] = true, ["'"] = true }
+  for open, rule in pairs(rules) do
+    if rule ~= false and open ~= rule.close then
+      openers[open], closers[rule.close] = rule.close, open
+    elseif rule ~= false then
+      quotes[open] = true
+    end
+  end
+  local tick_quotes = vim.tbl_extend("force", quotes, { ["`"] = true })
+  return {
+    rules = rules,
+    multi_rules = multi_rules,
+    openers = openers,
+    closers = closers,
+    quotes = quotes,
+    tick_quotes = tick_quotes,
+  }
+end
 
 M.defaults = {
   enabled = true,
@@ -132,6 +154,7 @@ function M.build(opts)
   validate_multi(config.multi_pairs)
   require("pairs.tex_env").validate(config.tex_environments)
   assert(type(config.filetypes) == "table", "pairs: filetypes must be a table")
+  local metadata = { default = prepare(config.pairs, config.multi_pairs), filetypes = {} }
   for ft, overrides in pairs(config.filetypes) do
     assert(type(ft) == "string" and type(overrides) == "table", "pairs: invalid filetype override")
     if overrides.tex_environments ~= nil then
@@ -139,9 +162,9 @@ function M.build(opts)
     end
     local rules = merge_rules(config.pairs, overrides.pairs)
     validate_pairs(rules)
-    validate_multi(
+    local multi =
       vim.tbl_deep_extend("force", vim.deepcopy(config.multi_pairs), overrides.multi_pairs or {})
-    )
+    validate_multi(multi)
     require("pairs.tex_env").validate(
       vim.tbl_deep_extend(
         "force",
@@ -152,8 +175,23 @@ function M.build(opts)
     if overrides.enabled ~= nil then
       assert(type(overrides.enabled) == "boolean", "pairs: filetype enabled must be boolean")
     end
+    metadata.filetypes[ft] = prepare(rules, multi)
   end
+  prepared[config] = metadata
   return config
+end
+
+-- Internal capture path returns read-only setup metadata. Public resolve helpers
+-- below retain independent tables; live buffer rules still merge and validate.
+function M.capture(config, ft, buffer)
+  local metadata = assert(prepared[config], "pairs: configuration was not built")
+  local base = metadata.filetypes[ft] or metadata.default
+  if not buffer then
+    return base
+  end
+  local rules = merge_rules(base.rules, buffer)
+  validate_pairs(rules)
+  return prepare(rules, base.multi_rules)
 end
 
 function M.resolve(config, ft, buffer)

@@ -261,15 +261,47 @@ help tags, health, formatting and diff checks pass. All 172 tracked local
 configuration files retain their original bytes. External LSP responses remain
 separate acceptance work.
 
+## Input benchmark and measured optimization milestone (implemented)
+
+- Add an isolated, repeatable headless benchmark for prepared decision timing
+  and separate actual mapped input batches. Record median/P95/max, Lua heap
+  growth, environment and source fingerprints; optionally instrument stages.
+- Cover ordinary delimiters, live buffer overrides, long lines, scan limits,
+  large files, current/pending parser context and the first decision after a
+  real edit. Verify mapped text, undo/redo and dot repeat; CI gates behavior
+  without machine-dependent timing thresholds.
+- Reuse setup-validated single/multi rule metadata. Keep buffer overrides live
+  and validated, public resolver results independent, and predicate evaluation
+  order unchanged. Do not cache text or parser state.
+- Scan empty-pair deletion/Enter prefixes once while retaining the quote state
+  before the final opener and the full-prefix comment/error/scan-limit guards.
+
+Three matched runs on Neovim 0.12.5/Apple M5 Pro show quote decision medians
+5.79 -> 1.83 us and 2000-byte-prefix deletion 44.83 -> 21.21 us. The real first
+decision after editing a 50000-line Python buffer remains about 3 ms. These
+headless measurements exclude rendering and physical keyboard latency.
+See [benchmark methods and results](BENCHMARKS.md).
+
+Validation: 1276 cumulative real-input tests pass on Neovim 0.11.0 and 0.12.5
+with pinned parser fixtures; 514 pass without fixtures. Benchmark smoke runs
+pass on the minimum version, with CI parameters, and without parser fixtures.
+The actual local configuration passes 244 input cases with real blink.cmp,
+LuaSnip and VimTeX; external LSP startup is stubbed. Default/minimal/Python
+startup profiles, help tags, executable README/help examples, health, formatting
+and diff checks pass. All 172 tracked configuration files retain their original
+bytes. Physical keyboard-to-screen latency and real LSP responses remain
+separate acceptance work.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
    regression case before refining heuristics.
 2. Extend completion/snippet acceptance to more languages and real LSP sources,
    including auto-insert previews and semantic bracket resolution.
-3. Extend command profiles only for concrete editing examples.
-   Evaluate angle brackets with explicit context and priority.
-4. Measure real typing latency before considering caching or incremental scans.
+3. Improve diagnostics for concrete mispair reports; consider angle brackets
+   only with explicit context and priority. Further LaTeX features are paused.
+4. Measure latency in the real interactive client before considering parser
+   scheduling changes or incremental text scans.
 5. Expand beyond Insert mode only after its behavior has settled.
 
 Every milestone should pass the cumulative regression suite before a focused

@@ -17,6 +17,13 @@ jobs:
       - run: ./tests/run.sh
         env:
           PAIRS_TEST_PARSER_ROOT: ${{ runner.temp }}/pairs-parsers
+      - run: ./tests/bench.sh
+        env:
+          PAIRS_TEST_PARSER_ROOT: ${{ runner.temp }}/pairs-parsers
+          PAIRS_BENCH_SAMPLES: 100
+          PAIRS_BENCH_LINES: 1000
+          PAIRS_BENCH_MAPPED_SAMPLES: 5
+          PAIRS_BENCH_OUTPUT: ${{ runner.temp }}/pairs-benchmark.json
 
   format:
     runs-on: ubuntu-latest

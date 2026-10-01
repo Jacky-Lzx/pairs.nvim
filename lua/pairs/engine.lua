@@ -37,7 +37,8 @@ function M.decide(ctx, key)
     )
   end
   local scan_line = ctx.lex_line or ctx.line
-  local state = lex.scan(scan_line, ctx.col, ctx.lex)
+  local empty_key = key == "<BS>" or key == "<CR>"
+  local state = lex.scan(scan_line, ctx.col, ctx.lex, empty_key)
   if state.uncertain then
     return decision("pass", state.reason)
   end
@@ -46,12 +47,12 @@ function M.decide(ctx, key)
   end
   local prev, next_char = lex.previous(ctx.line, ctx.col), lex.next(ctx.line, ctx.col)
 
-  if key == "<BS>" or key == "<CR>" then
+  if empty_key then
     local rule = ctx.rules[prev]
     if not rule or rule == false or next_char ~= rule.close then
       return decision("pass", "not_empty_pair")
     end
-    local before = lex.scan(scan_line, ctx.col - #prev, ctx.lex)
+    local before = state.before
     if
       before.uncertain
       or before.comment

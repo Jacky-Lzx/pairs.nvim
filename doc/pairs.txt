@@ -37,6 +37,9 @@ Re-enabling a single-character rule disabled with false requires its close value
 
 Buffer overrides use b:pairs_enabled and b:pairs_rules. Buffer rules override
 global and filetype rules; newly introduced delimiters need explicit mappings.
+Validated single/multi rule metadata from setup is reused across keys. Buffer
+overrides are still read, merged and validated on every capture; changing them
+does not require another setup. Filetype switches and re-setup select new rules.
 
 PYTHON TRIPLE QUOTES                                      *pairs-triples*
 
@@ -347,6 +350,27 @@ COMMANDS                                                 *pairs-commands*
 :PairsToggle           Toggle pairing globally.
 :PairsInspect {key}    Preview insertion before the cursor; does not edit text.
 :checkhealth pairs     Inspect initialization and setup-time mapping conflicts.
+
+BENCHMARK                                                *pairs-bench*
+
+From the plugin checkout: >sh
+    ./tests/bench.sh
+    PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers \
+      PAIRS_BENCH_OUTPUT=/tmp/pairs-benchmark.json ./tests/bench.sh
+<
+Use tests/install-parsers.sh to prepare the optional pinned parser fixtures.
+The benchmark runs in isolated XDG directories and reports decision timing
+in microseconds (median/P95/max), plus separate mapped input batch timing.
+Mapped batches check resulting text, undo/redo and dot repeat.
+
+PAIRS_BENCH_SAMPLES defaults to 1000 (minimum 100), PAIRS_BENCH_LINES to 50000
+(minimum 1000), and PAIRS_BENCH_MAPPED_SAMPLES to 20 (minimum 5).
+PAIRS_BENCH_PROFILE=1 adds an instrumented stage breakdown outside the latency
+measurements. JSON includes source/benchmark fingerprints and environment data.
+The separate GC-paused Lua heap estimate measures allocation growth, not
+retained memory. Screen rendering and physical keyboard latency are excluded.
+CI checks behavior without timing thresholds. See docs/BENCHMARKS.md for methods
+and a measured before/after comparison.
 
 LIMITS                                                   *pairs-limits*
 

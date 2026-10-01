@@ -28,7 +28,7 @@ function M.capture(config, global_enabled, assume_insert)
   local buf = vim.api.nvim_get_current_buf()
   local cursor = vim.api.nvim_win_get_cursor(0)
   local ft = vim.bo[buf].filetype
-  local rules = require("pairs.config").resolve(config, ft, vim.b[buf].pairs_rules)
+  local resolved = require("pairs.config").capture(config, ft, vim.b[buf].pairs_rules)
   local enabled = global_enabled and vim.b[buf].pairs_enabled ~= false
   local reason
   if not enabled then
@@ -50,14 +50,7 @@ function M.capture(config, global_enabled, assume_insert)
   elseif not config.enabled then
     enabled, reason = false, "disabled"
   end
-  local openers, closers, quotes = {}, {}, { ['"'] = true, ["'"] = true }
-  for open, rule in pairs(rules) do
-    if rule ~= false and open ~= rule.close then
-      openers[open], closers[rule.close] = rule.close, open
-    elseif rule ~= false then
-      quotes[open] = true
-    end
-  end
+  local quotes = resolved.quotes
   if
     ft == "javascript"
     or ft == "typescript"
@@ -65,8 +58,13 @@ function M.capture(config, global_enabled, assume_insert)
     or ft == "javascriptreact"
     or ft == "typescriptreact"
   then
-    quotes["`"] = true
+    quotes = resolved.tick_quotes
   end
+  -- Predicates can update multi rules. Keep their original evaluation order.
+  local multi_buffer = vim.b[buf].pairs_multi_rules
+  local multi_rules = multi_buffer
+      and require("pairs.config").resolve_multi(config, ft, multi_buffer)
+    or resolved.multi_rules
   local ctx = {
     buf = buf,
     filetype = ft,
@@ -74,14 +72,14 @@ function M.capture(config, global_enabled, assume_insert)
     col = cursor[2],
     enabled = enabled,
     disabled_reason = reason,
-    rules = rules,
-    multi_rules = require("pairs.config").resolve_multi(config, ft, vim.b[buf].pairs_multi_rules),
+    rules = resolved.rules,
+    multi_rules = multi_rules,
     row = cursor[1] - 1,
     lex = {
       max_scan_bytes = config.max_scan_bytes,
       line_comments = comments[ft] or {},
-      openers = openers,
-      closers = closers,
+      openers = resolved.openers,
+      closers = resolved.closers,
       quotes = quotes,
       rust = ft == "rust",
     },

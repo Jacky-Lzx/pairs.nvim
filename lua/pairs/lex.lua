@@ -59,13 +59,18 @@ local function rust_char(text, opening)
   return first ~= "" and text:sub(opening + #first + 1, opening + #first + 1) == "'"
 end
 
-function M.scan(text, col, opts)
+function M.scan(text, col, opts, include_before)
   if col > opts.max_scan_bytes then
     return { uncertain = true, reason = "scan_limit" }
   end
-  local quote, stack = nil, {}
+  local quote, stack, before = nil, {}, nil
   local i, backslashes = 1, 0
   while i <= col do
+    if include_before and i == col then
+      -- Empty-pair actions only need the quote state before the final ASCII
+      -- opener. Any earlier error/comment still aborts the complete scan below.
+      before = { quote = quote }
+    end
     local char = text:sub(i, i)
     local escaped = backslashes % 2 == 1
     if quote then
@@ -102,7 +107,7 @@ function M.scan(text, col, opts)
     backslashes = char == "\\" and backslashes + 1 or 0
     i = i + 1
   end
-  return { quote = quote, stack = stack }
+  return { quote = quote, stack = stack, before = before }
 end
 
 return M
