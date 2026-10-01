@@ -321,7 +321,7 @@ Comments, existing math, verbatim/listing/minted environments and inline
 protect the rest of their line. Unfinished ordinary environments such as
 `document`, `center`, lists and figures can recover an opening boundary;
 unknown environments, unresolved earlier delimiters and recovery prefixes
-exceeding 256 direct syntax children pass through. Missing/pending parsers
+exceeding 256 syntax nodes pass through. Missing/pending parsers
 also preserve original input. No synchronous parse or buffer-wide text scan
 is requested.
 
@@ -377,6 +377,68 @@ bracket keys. Existing mappings are preserved and reported by `status().conflict
 a custom owner can compose `expr("\\")` to use the backslash skip behavior.
 Completion/snippet buffer edits are not re-paired. Keep the existing
 accept → `pairs.expr("<CR>")` → fallback chain when completion owns Enter.
+
+## LaTeX environment declarations
+
+Extend the known environment modes with `tex_environments`. Declarations apply
+in `tex` and `plaintex`, require current `latex` parser context and do not enable
+math delimiter rules themselves:
+
+```lua
+require("pairs").setup({
+  treesitter = true,
+  tex_environments = {
+    abstract = "text",
+    theorem = "text",
+    proof = "text",
+    mymath = "math",
+    mycode = "literal",
+  },
+  multi_pairs = { ["$$"] = {}, ["\\("] = {}, ["\\["] = {} },
+})
+```
+
+| Mode | Behavior |
+| --- | --- |
+| `"text"` | Allow configured math pairs at valid boundaries. |
+| `"math"` | Preserve math delimiter input; ordinary brackets still pair. |
+| `"literal"` | Preserve all plugin-owned keys, including quote/bracket input, Backspace and Enter. |
+| `false` | Remove a text/custom declaration; treat the name as unknown. |
+
+Defaults include the previously supported text environments (`document`, lists,
+figures, etc.) and the parser's built-in math/raw environments. Unknown names
+remain conservative for math delimiters. Names match exactly, including a `*`
+suffix; declarations are not wildcard patterns. Names must be 1–62 ASCII letters,
+digits or `_`, `.`, `:`, `-`, `*` characters. Built-in math protections can be
+strengthened to `"literal"`; built-in math/raw modes cannot be weakened or removed.
+Parser-confirmed math, comments and raw nodes retain their protection.
+
+Overrides merge in the order defaults → global `tex_environments` →
+`filetypes[ft].tex_environments` → `vim.b.pairs_tex_environments`:
+
+```lua
+-- Setup-time override for one filetype:
+filetypes = { tex = { tex_environments = { proof = "math" } } }
+-- Live buffer override:
+vim.b.pairs_tex_environments = { proof = "text", mycode = "literal" }
+```
+
+An inner text environment cannot lift an outer math/literal restriction. Raw
+code may contain environment-looking text; its matching end command releases
+that scope. Completed sibling environments do not affect the following text.
+A complete `\begin{name}` header can establish a mode before its `\end{name}`
+is written, including file-end blank lines. Partial headers, mismatched scopes
+and unprovable recovery preserve input. Each prefix traversal is limited to 256
+syntax nodes and excludes future content. Declaring custom raw modes also checks
+preceding scope metadata, so unresolved/over-budget prefixes keep all pairing
+keys native. No full buffer-text scan, synchronous parse or highlighting setup
+is requested.
+
+VimTeX indentation, existing mappings, completion and snippet expansion keep
+their own behavior. A missing parser retains the existing line-local lexer
+fallback; environment modes require parser evidence. Pending parses pass keys
+through. Invalid setup options preserve the current setup; invalid buffer
+options pass keys through with a `context_error` diagnostic from `explain()`.
 
 ## Mappings and completion
 
@@ -461,7 +523,7 @@ They cover quotes, nesting, UTF-8 neighbors, backspace, Enter/indentation,
 undo/redo, dot repeat,
 configuration precedence, Python triple quotes and prefixes, JavaScript/TypeScript
 templates, tagged/nested templates and interpolation, Markdown fence boundaries
-and code-language injections, LaTeX math delimiters and verbatim/math boundaries,
+and code-language injections, LaTeX math delimiters, environment declarations and verbatim/math boundaries,
 Tree-sitter literal/interpolation boundaries and
 pending parses, completion/snippet-style buffer edits, macro/paste behavior,
 and mapping lifecycle. CI checks the minimum

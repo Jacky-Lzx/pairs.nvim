@@ -24,7 +24,8 @@ Options:
   disabled_filetypes   list of disabled filetypes
   pairs                table keyed by opening delimiter; false disables a rule
   multi_pairs          opt-in triples, templates, fences, LaTeX math; default {}
-  filetypes            filetype -> { pairs, multi_pairs, enabled } overrides
+  tex_environments     TeX environment name -> text/math/literal/false
+  filetypes            filetype -> rule/environment/enabled overrides
 
 Rules contain close (single ASCII character), open, skip, delete, and newline
 (booleans). Open/skip/delete default to true for new rules. Newline defaults
@@ -184,7 +185,7 @@ Comments, existing math and verbatim/listing/minted environments stay literal.
 Inline \verb spans (including unfinished spans) are protected. \lstinline and
 \mintinline conservatively protect their remaining line. Opening recovery in
 unfinished document/center/list/figure and other known text environments is
-bounded to 256 direct syntax children. Unknown environments, unresolved earlier
+bounded to 256 syntax nodes. Unknown environments, unresolved earlier
 delimiters and missing/pending parser context keep original input. No full
 synchronous parse or buffer-wide text scan is requested.
 
@@ -226,6 +227,49 @@ bracket keys. Existing mappings are preserved and reported in status().conflicts
 custom owners can compose expr('\\') to skip the backslash of a proven closer.
 Completion/snippet edits are not re-paired. For completion-owned Enter, use
 accept -> expr('<CR>') -> fallback as usual.
+
+LATEX ENVIRONMENT DECLARATIONS                           *pairs-tex-env*
+
+tex_environments extends known modes in tex/plaintex. Requires current latex
+parser context; declarations do not enable math delimiter rules themselves: >lua
+    require('pairs').setup({
+      treesitter = true,
+      tex_environments = {
+        abstract = 'text', theorem = 'text', proof = 'text',
+        mymath = 'math', mycode = 'literal',
+      },
+      multi_pairs = { ['$$'] = {}, ['\\('] = {}, ['\\['] = {} },
+    })
+<
+text       Allow configured math pairs at proven boundaries.
+math       Keep math delimiter input literal; ordinary brackets still pair.
+literal    Keep all pairing keys native, including quote/bracket input, BS, CR.
+false      Remove a text/custom declaration; treat the name as unknown.
+
+Defaults include document/list/figure/etc. text environments and the parser's
+built-in math/raw environments. Built-in protection cannot be weakened/removed;
+math can be strengthened to literal. Parser-confirmed math/comments/raw nodes
+remain protected. Names match exactly, including star suffixes (no wildcards).
+Names are 1-62 ASCII letters/digits or _, ., :, -, * characters.
+
+Precedence: defaults -> global tex_environments ->
+filetypes[ft].tex_environments -> b:pairs_tex_environments. For example: >lua
+    vim.b.pairs_tex_environments = { proof = 'text', mycode = 'literal' }
+<
+Inner text cannot lift outer math/literal restrictions. Raw code ignores other
+environment-looking text until its own matching end. Closed sibling scopes do
+not leak. Complete begin headers establish modes before an end is written,
+including trailing blank lines; partial headers remain conservative. Each
+prefix traversal visits at most 256 syntax nodes and excludes future content.
+Custom raw modes inspect preceding scope metadata; unresolved/over-budget
+prefixes keep all pairing keys native. No full buffer-text scan or synchronous
+parse is requested. Mismatched/unprovable scopes preserve input.
+
+VimTeX indentation, mapping ownership and completion/snippet expansion remain
+independent. Missing parsers use the existing line-local lexer fallback;
+environment modes require parser evidence. Pending parses pass keys through.
+Invalid setup options preserve existing setup; invalid buffer declarations
+pass through with explain().reason='context_error'.
 
 ENTER                                                    *pairs-enter*
 

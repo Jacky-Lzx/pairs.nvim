@@ -7,6 +7,7 @@ M.defaults = {
   treesitter = false,
   disabled_filetypes = { "TelescopePrompt", "snacks_picker_input" },
   multi_pairs = {},
+  tex_environments = vim.deepcopy(require("pairs.tex_env").defaults),
   pairs = {
     ["("] = { close = ")", open = true, skip = true, delete = true, newline = true },
     ["["] = { close = "]", open = true, skip = true, delete = true, newline = true },
@@ -129,13 +130,24 @@ function M.build(opts)
   end
   validate_pairs(config.pairs)
   validate_multi(config.multi_pairs)
+  require("pairs.tex_env").validate(config.tex_environments)
   assert(type(config.filetypes) == "table", "pairs: filetypes must be a table")
   for ft, overrides in pairs(config.filetypes) do
     assert(type(ft) == "string" and type(overrides) == "table", "pairs: invalid filetype override")
+    if overrides.tex_environments ~= nil then
+      require("pairs.tex_env").validate(overrides.tex_environments)
+    end
     local rules = merge_rules(config.pairs, overrides.pairs)
     validate_pairs(rules)
     validate_multi(
       vim.tbl_deep_extend("force", vim.deepcopy(config.multi_pairs), overrides.multi_pairs or {})
+    )
+    require("pairs.tex_env").validate(
+      vim.tbl_deep_extend(
+        "force",
+        vim.deepcopy(config.tex_environments),
+        overrides.tex_environments or {}
+      )
     )
     if overrides.enabled ~= nil then
       assert(type(overrides.enabled) == "boolean", "pairs: filetype enabled must be boolean")
@@ -159,6 +171,20 @@ function M.resolve_multi(config, ft, buffer)
   )
   validate_multi(rules)
   return rules
+end
+
+function M.resolve_tex(config, ft, buffer)
+  if buffer ~= nil then
+    require("pairs.tex_env").validate(buffer)
+  end
+  local environments = vim.tbl_deep_extend(
+    "force",
+    vim.deepcopy(config.tex_environments),
+    (config.filetypes[ft] or {}).tex_environments or {},
+    buffer or {}
+  )
+  require("pairs.tex_env").validate(environments)
+  return environments
 end
 
 return M

@@ -39,6 +39,7 @@ local function seed(marked, ft)
   vim.bo.cinkeys = "0{,0},0),0],:,0#,!^F,o,O,e"
   vim.b.pairs_rules = nil
   vim.b.pairs_multi_rules = nil
+  vim.b.pairs_tex_environments = nil
   vim.b.pairs_enabled = nil
   local start = assert(marked:find("│", 1, true), "missing cursor marker")
   local prefix, suffix = marked:sub(1, start - 1), marked:sub(start + #"│")
@@ -1055,6 +1056,15 @@ dofile("tests/tex.lua")({
 })
 
 dofile("tests/tex_slash.lua")({
+  test = test,
+  input = input,
+  seed = seed,
+  feed = feed,
+  eq = eq,
+  plugin = plugin,
+})
+
+dofile("tests/tex_environments.lua")({
   test = test,
   input = input,
   seed = seed,

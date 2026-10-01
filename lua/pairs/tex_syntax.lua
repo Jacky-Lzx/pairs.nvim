@@ -20,25 +20,11 @@ local math_nodes = {
   math_environment = true,
   math_delimiter = true,
 }
--- A lone dollar can make the grammar recover a whole environment as ERROR.
--- Only recover ordinary environments whose content mode is known. Custom and
--- math environments stay literal until the grammar proves a valid boundary.
-local text_environments = {
-  document = true,
-  center = true,
-  flushleft = true,
-  flushright = true,
-  quote = true,
-  quotation = true,
-  itemize = true,
-  enumerate = true,
-  description = true,
-  figure = true,
-  ["figure*"] = true,
-  table = true,
-  ["table*"] = true,
-  minipage = true,
-}
+local priority = { text = 0, unknown = 1, math = 2, literal = 3 }
+
+local function restrict(current, mode)
+  return priority[mode] > priority[current] and mode or current
+end
 
 local function short_text(node, buf)
   if not node then
@@ -51,30 +37,133 @@ local function short_text(node, buf)
   return vim.treesitter.get_node_text(node, buf)
 end
 
-local function ordinary_prefix(parent, leaf, buf)
-  -- Inspect only direct recovery children, never descend through document
-  -- bodies. Bound work even when an incomplete document has many siblings.
-  for i = 0, math.min(parent:child_count(), 256) - 1 do
-    local child = parent:child(i)
-    if child:id() == leaf:id() then
+local function environment_name(begin, buf)
+  local text = begin and short_text(begin:field("name")[1], buf)
+  return text and text:match("^%{([%w_.:%*%-]+)%}$") or nil
+end
+
+local function environment_mode(begin, buf, environments)
+  local name = environment_name(begin, buf)
+  return name and environments[name] or "unknown"
+end
+
+local function recovery_prefix(parent, leaf, buf, environments, row, col)
+  -- Recovery can flatten scopes or put a raw body's end command inside math.
+  -- Inspect bounded syntax children, never fetch or scan the whole body text.
+  local stack, visited = {}, 0
+  local function mode()
+    local result = "text"
+    for _, scope in ipairs(stack) do
+      result = restrict(result, scope.mode)
+    end
+    return result
+  end
+  local function ending(child)
+    local name = environment_name(child, buf)
+    local active = stack[#stack]
+    if active and active.mode == "literal" then
+      if name == active.name then
+        stack[#stack] = nil
+      end
+      return true -- Other environment-looking text is raw code.
+    end
+    if not name or not active or name ~= active.name then
+      return false
+    end
+    stack[#stack] = nil
+    return true
+  end
+  local visit
+  visit = function(child)
+    local sr, sc, er, ec = child:range()
+    if sr > row or (sr == row and sc >= col) then
       return true
     end
-    if not child:named() or child:has_error() then
-      return false -- Includes an earlier unresolved math delimiter.
+    visited = visited + 1
+    if visited > 256 then
+      return false
     end
-    if child:type() == "begin" then
-      local name = short_text(child:field("name")[1], buf)
-      if not name or not text_environments[name:match("^%{(.*)%}$")] then
-        return false
+    local kind = child:type()
+    local raw = mode() == "literal"
+    if kind == "begin" then
+      if not raw then
+        local name = environment_name(child, buf)
+        if not name then
+          return false
+        end
+        stack[#stack + 1] = { name = name, mode = environments[name] or "unknown" }
       end
-    elseif child:type() == "generic_command" then
+      return true
+    elseif kind == "end" then
+      return ending(child)
+    elseif kind == "generic_command" then
       local command = short_text(child:field("command")[1], buf)
-      if not command or command == "\\begin" or command == "\\end" then
+      if command == "\\begin" or command == "\\end" then
+        local name = short_text(child:field("arg")[1], buf)
+        name = name and name:match("^%{([%w_.:%*%-]+)%}$")
+        if command == "\\end" then
+          local active = stack[#stack]
+          if raw then
+            if active and name == active.name then
+              stack[#stack] = nil
+            end
+            return true
+          end
+          if not active or not name or name ~= active.name then
+            return false
+          end
+          stack[#stack] = nil
+        elseif not raw then
+          if not name then
+            return false
+          end
+          stack[#stack + 1] = { name = name, mode = environments[name] or "unknown" }
+        end
+        return true
+      end
+      return raw or (command ~= nil and not child:has_error())
+    end
+    if not raw and kind:match("_environment$") and not child:has_error() then
+      local begin, finish = child:field("begin")[1], child:field("end")[1]
+      if finish and environment_name(begin, buf) == environment_name(finish, buf) then
+        return true -- A complete sibling is no longer an active scope.
+      end
+    elseif not raw and kind ~= "ERROR" then
+      return child:named() and not child:has_error()
+    end
+    -- Inside declared raw code, descend only containers that can hide commands.
+    -- Leaf text and punctuation need no interpretation.
+    for nested in child:iter_children() do
+      local nr, nc = nested:range()
+      if nr > row or (nr == row and nc >= col) then
+        break
+      end
+      if not visit(nested) then
         return false
       end
+    end
+    return true
+  end
+  for child in parent:iter_children() do
+    local sr, sc, er, ec = child:range()
+    local at_target = leaf and child:id() == leaf:id()
+    local is_end = child:type() == "end"
+      or (
+        child:type() == "generic_command"
+        and short_text(child:field("command")[1], buf) == "\\end"
+      )
+    local finished_end = is_end and (er < row or (er == row and ec <= col))
+    if (at_target and not finished_end) or sr > row or (sr == row and sc >= col) then
+      if at_target and mode() == "literal" then
+        return visit(child), mode() -- Its prefix may contain the raw scope's end.
+      end
+      return true, mode()
+    end
+    if not visit(child) then
+      return false, mode()
     end
   end
-  return false
+  return true, mode()
 end
 
 local function inline_literal(text, col)
@@ -106,7 +195,15 @@ local function inline_literal(text, col)
   return false
 end
 
-function M.capture(root, row, col, text, buf)
+function M.capture(root, row, col, text, buf, environments)
+  environments = environments or require("pairs.tex_env").defaults
+  local custom_literal = false
+  for name, mode in pairs(environments) do
+    if mode == "literal" and require("pairs.tex_env").protected[name] ~= "literal" then
+      custom_literal = true
+      break
+    end
+  end
   local result = { upgrade = false }
   if inline_literal(text, col) then
     return { blocked = true }
@@ -129,14 +226,12 @@ function M.capture(root, row, col, text, buf)
     and sc == col - 1
     and ec == col
   if candidate and parent then
-    if parent:type() == "ERROR" then
-      result.upgrade = ordinary_prefix(parent, leaf, buf)
-    elseif parent:type() == "inline_formula" then
+    if parent:type() == "inline_formula" then
       result.upgrade = parent:child(0):id() == leaf:id()
         and parent:child(parent:child_count() - 1):missing()
     end
   end
-  local node, math, branch = leaf, nil, nil
+  local node, formula, branch, region, uncertain = leaf, nil, nil, "text", false
   while node do
     local kind = node:type()
     local _, _, nr, nc = node:range()
@@ -144,18 +239,40 @@ function M.capture(root, row, col, text, buf)
       or (row == nr and col < nc)
       or (kind == "line_comment" and row == nr and col == nc)
     if inside and (literal[kind] or kind:find("comment", 1, true)) then
-      return { blocked = true }
+      region = "literal"
     end
-    if kind == "ERROR" and (not parent or node:id() ~= parent:id()) then
-      result.upgrade = false
+    if
+      kind == "ERROR"
+      or (custom_literal and (kind == "source_file" or kind == "generic_environment"))
+    then
+      local safe, mode = recovery_prefix(node, branch, buf, environments, row, col)
+      region = restrict(region, mode)
+      if not safe then
+        region = restrict(region, "unknown")
+        result.slash_open = false
+        uncertain = custom_literal
+      end
+      if kind == "ERROR" then
+        if candidate and parent and node:id() == parent:id() then
+          result.upgrade = safe and mode == "text"
+        else
+          result.upgrade = false
+        end
+      end
     end
-    if kind == "ERROR" and (not branch or not ordinary_prefix(node, branch, buf)) then
-      return { blocked = true } -- Recovery may have hidden an enclosing math zone.
-    elseif kind == "generic_environment" then
-      local begin = node:field("begin")[1]
-      local name = begin and short_text(begin:field("name")[1], buf)
-      if not name or not text_environments[name:match("^%{(.*)%}$")] then
-        return { blocked = true }
+    if kind:match("_environment$") then
+      local begin, ending = node:field("begin")[1], node:field("end")[1]
+      local er, ec
+      if ending then
+        er, ec = ending:end_()
+      end
+      local after_end = ending and (er < row or (er == row and ec <= col))
+      if not after_end then
+        if ending and environment_name(begin, buf) ~= environment_name(ending, buf) then
+          region = restrict(region, "unknown")
+        else
+          region = restrict(region, environment_mode(begin, buf, environments))
+        end
       end
     end
     if math_nodes[kind] then
@@ -163,8 +280,8 @@ function M.capture(root, row, col, text, buf)
       if not parent or node:id() ~= parent:id() then
         result.upgrade = false
       end
-      if (kind == "displayed_equation" or kind == "inline_formula") and not math then
-        math = node
+      if (kind == "displayed_equation" or kind == "inline_formula") and not formula then
+        formula = node
         local open, close = node:child(0), node:child(node:child_count() - 1)
         local expected = ({ ["$$"] = "$$", ["\\("] = "\\)", ["\\["] = "\\]" })[open:type()]
         if expected and close:type() == expected and not close:missing() then
@@ -179,12 +296,15 @@ function M.capture(root, row, col, text, buf)
             close_col = cc,
           }
         end
-      elseif math then
-        return { blocked = true } -- No nested formula inside another math zone.
+      elseif formula then
+        region = restrict(region, "math") -- No nested formula inside another math zone.
       end
     end
     branch = node
     node = node:parent()
+  end
+  if region ~= "text" then
+    return { blocked = true, literal = region == "literal", uncertain = uncertain, region = region }
   end
   return result
 end

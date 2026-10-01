@@ -214,14 +214,38 @@ the existing math shortcut and native undo/redo/dot. Default/minimal/Python
 startup smoke, help tags, executable setup examples, health, formatting and
 diff checks pass. External LSP responses remain separate acceptance work.
 
+## LaTeX environment classification milestone (implemented)
+
+- Declare exact environment names through `tex_environments`: text/math/literal
+  or false, with default/global/filetype/live-buffer precedence.
+- Move built-in declarations into metadata; validate names and mode values before
+  installing mappings. Built-in math/raw protection cannot be weakened.
+- Text declarations allow existing opt-in math rules. Math declarations prevent
+  nesting while retaining ordinary brackets. Literal declarations preserve all
+  pairing keys; outer restrictive scopes retain priority over inner text.
+- Recover complete begin headers without an end, including blank lines at EOF.
+  Track matching ends across parser recovery/raw bodies and ignore completed
+  siblings. Prefix traversal is bounded and excludes future syntax children.
+- Preserve parser-availability fallback, native input commands, VimTeX indentation,
+  completion/snippets and undo/redo/dot. Enable abstract/theorem/proof as text in
+  the user's local configuration without inventing custom math/code names.
+
+Validation: 1098 cumulative real-input tests pass on Neovim 0.11.0 and 0.12.5
+with pinned parser fixtures; 496 pass without fixtures. The actual local
+configuration passes 211 input cases with real blink.cmp/LuaSnip and VimTeX,
+including declared text environments, raw recovery, snippets and undo/dot.
+Default/minimal/Python startup profiles, executable README/help examples,
+help tags, health, formatting and diff checks pass. External LSP responses
+remain separate acceptance work.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
    regression case before refining heuristics.
 2. Extend completion/snippet acceptance to more languages and real LSP sources,
    including auto-insert previews and semantic bracket resolution.
-3. Refine LaTeX rules from real editing examples, especially custom environments
-   and incomplete command arguments. Evaluate angle brackets with explicit context.
+3. Refine incomplete LaTeX command arguments from real editing examples.
+   Evaluate angle brackets with explicit context and priority.
 4. Measure real typing latency before considering caching or incremental scans.
 5. Expand beyond Insert mode only after its behavior has settled.
 

@@ -278,7 +278,7 @@ local function code_prefix(root, text, row, col, start)
   return masked
 end
 
-function M.capture(buf, row, col, text)
+function M.capture(buf, row, col, text, environments)
   -- These filetypes are not registered as aliases in a bare Neovim runtime.
   -- Respect an explicit language registration before using standard aliases.
   local ft = vim.bo[buf].filetype
@@ -313,12 +313,17 @@ function M.capture(buf, row, col, text)
   if parser:lang() == "latex" then
     local outer = parser:tree_for_range(range)
     if outer then
-      tex = require("pairs.tex_syntax").capture(outer:root(), row, col, text, buf)
+      tex = require("pairs.tex_syntax").capture(outer:root(), row, col, text, buf, environments)
     end
   end
   local function with_context(context)
     context.fence = fence
     context.tex = tex
+    if tex and tex.literal then
+      context.syntax, context.literal_string = "string", true
+    elseif tex and tex.uncertain then
+      context.syntax = "unknown"
+    end
     return context
   end
   -- Tagged templates can inject HTML/SQL/etc. Those trees do not contain the

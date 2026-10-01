@@ -87,7 +87,13 @@ function M.capture(config, global_enabled, assume_insert)
     },
   }
   if enabled and config.treesitter and #ctx.line <= config.max_scan_bytes then
-    local syntax = require("pairs.syntax").capture(buf, cursor[1] - 1, cursor[2], ctx.line)
+    local environments
+    if ft == "tex" or ft == "plaintex" then
+      environments =
+        require("pairs.config").resolve_tex(config, ft, vim.b[buf].pairs_tex_environments)
+    end
+    local syntax =
+      require("pairs.syntax").capture(buf, cursor[1] - 1, cursor[2], ctx.line, environments)
     for key, value in pairs(syntax) do
       ctx[key] = value
     end
