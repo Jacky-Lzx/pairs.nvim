@@ -238,13 +238,36 @@ Default/minimal/Python startup profiles, executable README/help examples,
 help tags, health, formatting and diff checks pass. External LSP responses
 remain separate acceptance work.
 
+## LaTeX command argument milestone (implemented)
+
+- Recognize heading/formatting text arguments, including optional heading titles
+  and starred heading forms. Allow configured inline math and normal brackets;
+  display openings inside command arguments remain native.
+- Protect URL/path payloads, distinguish href address from display text, and
+  retain structural outer-delimiter skip/delete according to existing rules.
+- Recover unfinished/nested/multiline parameters using current syntax anchors
+  and a prefix of at most 32 lines/4096 bytes. Check byte budget before reads,
+  preserve unsafe/missing/pending contexts and do not force synchronous parsing.
+- Mask completed raw payloads in the current line so URI quotes/percent escapes
+  cannot poison following code; preserve real comments and outer restrictions.
+- Preserve VimTeX, completion/snippets and undo/redo/dot without new user options.
+
+Validation: 1259 cumulative real-input tests pass on Neovim 0.11.0 and 0.12.5
+with pinned parser fixtures; 497 pass without fixtures. The actual local
+configuration passes 244 input cases with real blink.cmp/LuaSnip and VimTeX,
+including complete continuous commands, argument formulas and snippet jumps.
+Default/minimal/Python startup profiles, executable README/help examples,
+help tags, health, formatting and diff checks pass. All 172 tracked local
+configuration files retain their original bytes. External LSP responses remain
+separate acceptance work.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
    regression case before refining heuristics.
 2. Extend completion/snippet acceptance to more languages and real LSP sources,
    including auto-insert previews and semantic bracket resolution.
-3. Refine incomplete LaTeX command arguments from real editing examples.
+3. Extend command profiles only for concrete editing examples.
    Evaluate angle brackets with explicit context and priority.
 4. Measure real typing latency before considering caching or incremental scans.
 5. Expand beyond Insert mode only after its behavior has settled.

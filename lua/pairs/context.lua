@@ -97,6 +97,9 @@ function M.capture(config, global_enabled, assume_insert)
     for key, value in pairs(syntax) do
       ctx[key] = value
     end
+  elseif enabled and config.treesitter and (ft == "tex" or ft == "plaintex") then
+    -- A long future suffix must not bypass raw argument/environment protection.
+    ctx.syntax = "unknown"
   end
   return ctx
 end

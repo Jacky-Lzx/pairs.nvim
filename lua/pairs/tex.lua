@@ -69,6 +69,9 @@ local function dollars(ctx, key, rule)
       return action
     end
   end
+  if ctx.tex.argument then
+    return { action = "pass", reason = "tex_argument_display" }
+  end
   if
     key == "$"
     and rule.open
@@ -88,6 +91,9 @@ local function slash_math(ctx, key, rules)
     local guard = syntax_guard(ctx)
     if guard then
       return guard
+    end
+    if opening == "\\[" and ctx.tex.argument then
+      return { action = "pass", reason = "tex_argument_display" }
     end
     if
       rule.open
@@ -124,6 +130,29 @@ end
 function M.decide(ctx, key)
   if ctx.filetype ~= "tex" and ctx.filetype ~= "plaintex" then
     return nil
+  end
+  local argument = ctx.tex and ctx.tex.argument
+  if argument and argument.close and argument.proven then
+    local open = argument.close == "}" and "{" or "["
+    local rule = ctx.rules[open]
+    if rule and rule ~= false then
+      if key == argument.close and rule.skip then
+        return {
+          action = "skip",
+          reason = "tex_argument_closer",
+          open = open,
+          close = argument.close,
+          move = 1,
+        }
+      elseif key == "<BS>" and argument.empty and rule.delete then
+        return {
+          action = "delete",
+          reason = "empty_tex_argument",
+          open = open,
+          close = argument.close,
+        }
+      end
+    end
   end
   local rules = ctx.multi_rules or {}
   local dollar = rules["$$"]

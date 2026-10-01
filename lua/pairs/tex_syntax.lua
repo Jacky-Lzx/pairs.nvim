@@ -47,7 +47,7 @@ local function environment_mode(begin, buf, environments)
   return name and environments[name] or "unknown"
 end
 
-local function recovery_prefix(parent, leaf, buf, environments, row, col)
+local function recovery_prefix(parent, leaf, buf, environments, row, col, argument)
   -- Recovery can flatten scopes or put a raw body's end command inside math.
   -- Inspect bounded syntax children, never fetch or scan the whole body text.
   local stack, visited = {}, 0
@@ -78,6 +78,13 @@ local function recovery_prefix(parent, leaf, buf, environments, row, col)
     local sr, sc, er, ec = child:range()
     if sr > row or (sr == row and sc >= col) then
       return true
+    end
+    if
+      argument
+      and argument.proven
+      and (sr > argument.start_row or (sr == argument.start_row and sc >= argument.start_col))
+    then
+      return true -- This prefix is a validated command argument, not a lost scope.
     end
     visited = visited + 1
     if visited > 256 then
@@ -208,6 +215,7 @@ function M.capture(root, row, col, text, buf, environments)
   if inline_literal(text, col) then
     return { blocked = true }
   end
+  local argument = require("pairs.tex_args").capture(root, row, col, text, buf)
   local left = math.max(col - 1, 0)
   local leaf = root:descendant_for_range(row, left, row, left)
   local parent = leaf:parent()
@@ -232,21 +240,32 @@ function M.capture(root, row, col, text, buf, environments)
     end
   end
   local node, formula, branch, region, uncertain = leaf, nil, nil, "text", false
+  local outer_literal = false
   while node do
     local kind = node:type()
-    local _, _, nr, nc = node:range()
+    local br, bc, nr, nc = node:range()
     local inside = row < nr
       or (row == nr and col < nc)
       or (kind == "line_comment" and row == nr and col == nc)
     if inside and (literal[kind] or kind:find("comment", 1, true)) then
-      region = "literal"
+      local recovered_comment = kind:find("comment", 1, true)
+        and require("pairs.tex_args").raw_comment(argument, br, bc)
+      if not recovered_comment then
+        region = "literal"
+      end
+      local raw_content = argument
+        and argument.mode == "literal"
+        and argument.proven
+        and (br > argument.start_row or (br == argument.start_row and bc >= argument.start_col))
+      outer_literal = outer_literal or (not raw_content and not recovered_comment)
     end
     if
       kind == "ERROR"
       or (custom_literal and (kind == "source_file" or kind == "generic_environment"))
     then
-      local safe, mode = recovery_prefix(node, branch, buf, environments, row, col)
+      local safe, mode = recovery_prefix(node, branch, buf, environments, row, col, argument)
       region = restrict(region, mode)
+      outer_literal = outer_literal or mode == "literal"
       if not safe then
         region = restrict(region, "unknown")
         result.slash_open = false
@@ -271,7 +290,9 @@ function M.capture(root, row, col, text, buf, environments)
         if ending and environment_name(begin, buf) ~= environment_name(ending, buf) then
           region = restrict(region, "unknown")
         else
-          region = restrict(region, environment_mode(begin, buf, environments))
+          local mode = environment_mode(begin, buf, environments)
+          region = restrict(region, mode)
+          outer_literal = outer_literal or mode == "literal"
         end
       end
     end
@@ -303,8 +324,25 @@ function M.capture(root, row, col, text, buf, environments)
     branch = node
     node = node:parent()
   end
+  if argument then
+    result.lex_line = argument.lex_line
+    result.raw_comment = not outer_literal and not argument.comment and argument.lex_line ~= nil
+    if argument.active and not outer_literal and not uncertain and not argument.unsafe then
+      result.argument = argument
+    end
+    region = restrict(region, argument.mode or "unknown")
+    uncertain = uncertain or argument.unsafe
+  end
   if region ~= "text" then
-    return { blocked = true, literal = region == "literal", uncertain = uncertain, region = region }
+    return {
+      blocked = true,
+      literal = region == "literal",
+      uncertain = uncertain,
+      region = region,
+      argument = result.argument,
+      lex_line = result.lex_line,
+      raw_comment = result.raw_comment,
+    }
   end
   return result
 end

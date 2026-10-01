@@ -440,6 +440,54 @@ fallback; environment modes require parser evidence. Pending parses pass keys
 through. Invalid setup options preserve the current setup; invalid buffer
 options pass keys through with a `context_error` diagnostic from `explain()`.
 
+## LaTeX command arguments
+
+With `treesitter = true` and a current `latex` parser, known command arguments
+have their own context in `tex` and `plaintex`. No extra option is required.
+Existing `multi_pairs` options still control math delimiters:
+
+```lua
+require("pairs").setup({
+  treesitter = true,
+  multi_pairs = { ["\\("] = {} },
+})
+```
+
+- Text arguments of `\section`, `\subsection`, `\subsubsection`, `\chapter`,
+  `\part`, `\paragraph`, `\subparagraph` (including starred forms), `\textbf`,
+  `\textit`, `\textrm`, `\textsf`, `\texttt`, `\textnormal`, `\emph` and
+  `\underline` allow ordinary brackets and configured `\( … \)` pairs.
+  Heading optional titles also count as text. Display openings `\[` and `$$`
+  stay native inside command arguments.
+- `\url`, `\nolinkurl`, `\path` and the first mandatory `\href` argument keep
+  payload quotes, brackets, math delimiters, Backspace and Enter native. The
+  second mandatory `\href` argument is text; its optional settings remain
+  conservative for math input.
+- The outer argument braces, and heading optional-title brackets, follow their
+  normal configured rules. Proven structural closers can be skipped, including
+  across lines; Backspace between empty outer delimiters can remove both.
+  Brackets inside a raw payload do not get this treatment.
+
+For example, typing `\(` at `\textbf{│}` produces `\textbf{\(│\)}`; typing
+`(` at `\url{│}` produces `\url{(│}`. A URI quote or `%20` does not hide the
+following text after the argument ends. A real comment after a URI remains a
+comment. Escaped braces and nested groups are accounted for.
+
+Unfinished mandatory/optional parameters and trailing blank lines use a bounded
+prefix anchored in the current syntax tree: at most 32 lines and 4096 bytes.
+The byte budget is checked before reading the prefix; no future body text or
+full buffer scan is requested. Unsafe or over-budget recovery preserves input.
+Unknown command parameters remain conservative for math delimiters. Outer
+math/raw environments, comments and parser-confirmed text-in-math nodes retain
+their restrictions. Missing parsers retain the existing line-local fallback;
+pending parses pass keys through without forcing synchronous parsing. With
+Tree-sitter enabled, LaTeX lines beyond `max_scan_bytes` also pass keys through,
+so a long future suffix cannot bypass raw protection.
+
+VimTeX indentation, completion/snippet expansion and mapping ownership retain
+their existing behavior. Command argument profiles currently cover the built-in
+names above; user-defined command profiles are not configurable.
+
 ## Mappings and completion
 
 Setup preserves existing global mappings and leaves buffer mappings alone.
@@ -523,7 +571,7 @@ They cover quotes, nesting, UTF-8 neighbors, backspace, Enter/indentation,
 undo/redo, dot repeat,
 configuration precedence, Python triple quotes and prefixes, JavaScript/TypeScript
 templates, tagged/nested templates and interpolation, Markdown fence boundaries
-and code-language injections, LaTeX math delimiters, environment declarations and verbatim/math boundaries,
+and code-language injections, LaTeX math delimiters, environment declarations, command arguments and verbatim/math boundaries,
 Tree-sitter literal/interpolation boundaries and
 pending parses, completion/snippet-style buffer edits, macro/paste behavior,
 and mapping lifecycle. CI checks the minimum

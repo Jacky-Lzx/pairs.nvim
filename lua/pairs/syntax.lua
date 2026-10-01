@@ -319,6 +319,12 @@ function M.capture(buf, row, col, text, environments)
   local function with_context(context)
     context.fence = fence
     context.tex = tex
+    if tex and tex.lex_line then
+      context.lex_line = tex.lex_line
+      if tex.raw_comment and context.syntax == "comment" then
+        context.syntax = "code"
+      end
+    end
     if tex and tex.literal then
       context.syntax, context.literal_string = "string", true
     elseif tex and tex.uncertain then

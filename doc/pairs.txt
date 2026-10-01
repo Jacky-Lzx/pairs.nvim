@@ -271,6 +271,45 @@ environment modes require parser evidence. Pending parses pass keys through.
 Invalid setup options preserve existing setup; invalid buffer declarations
 pass through with explain().reason='context_error'.
 
+LATEX COMMAND ARGUMENTS                                  *pairs-tex-args*
+
+With treesitter=true and a current latex parser, built-in command parameters
+have their own context in tex/plaintex. No new setup option is needed: >lua
+    require('pairs').setup({
+      treesitter = true,
+      multi_pairs = { ['\\('] = {} },
+    })
+<
+Text: section/subsection/subsubsection/chapter/part/paragraph/subparagraph
+(including starred forms and optional titles), textbf/textit/textrm/textsf/
+texttt/textnormal/emph/underline. Ordinary brackets and configured \( ... \)
+pairs work inside their text arguments; display openings \[ and $$ stay native.
+
+Raw: url/nolinkurl/path payloads and href's first mandatory argument preserve
+quote/bracket/math input, BS and CR. href's second mandatory argument is text;
+its optional settings stay conservative for math. Payload %20 and quotes do not
+poison following text after the argument ends; a real following comment remains
+protected. Escaped braces and nested groups are accounted for.
+
+Outer argument braces and heading optional-title brackets follow normal rule
+options. Proven structural closers can be skipped, even across lines. BS between
+empty outer delimiters can delete both. Interior raw brackets remain native.
+Typing \( at \textbf{|} yields \textbf{\(|\)}; typing ( at \url{|} yields
+\url{(|}. Here | marks the insertion point, not a literal character.
+
+Incomplete parameters and trailing blank lines use current syntax anchors and
+a prefix of at most 32 lines/4096 bytes. The byte budget is checked before
+reading; future body text and full buffer scans are not requested. Unsafe or
+over-budget recovery preserves input. Unknown command parameters remain
+conservative for math. Outer math/raw environments, comments and text-in-math
+nodes keep their restrictions. Missing parsers use the line-local fallback;
+pending parses pass through without forcing synchronous parsing. With
+treesitter enabled, LaTeX lines beyond max_scan_bytes also pass through so a
+long future suffix cannot bypass raw protection.
+
+VimTeX indentation, completion/snippets and mapping ownership keep their own
+behavior. Built-in profiles above are fixed, not a configurable command API.
+
 ENTER                                                    *pairs-enter*
 
 <CR> between adjacent empty brackets creates an indented middle line and a
