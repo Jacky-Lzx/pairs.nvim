@@ -1,4 +1,4 @@
--- Extract dollar boundaries from the current outer LaTeX tree.
+-- Extract math boundaries from the current outer LaTeX tree.
 local lex = require("pairs.lex")
 local M = {}
 local literal = {
@@ -115,6 +115,13 @@ function M.capture(root, row, col, text, buf)
   local leaf = root:descendant_for_range(row, left, row, left)
   local parent = leaf:parent()
   local sr, sc, er, ec = leaf:range()
+  -- A pending control symbol may consume the following space/punctuation in
+  -- the grammar. Only the typed prefix must be exactly one backslash.
+  result.slash_open = leaf:type() == "command_name"
+    and sr == row
+    and sc == col - 1
+    and text:sub(col, col) == "\\"
+    and not lex.escaped(text, col - 1)
   local candidate = leaf:type() == "$"
     and not leaf:missing()
     and sr == row
@@ -129,7 +136,7 @@ function M.capture(root, row, col, text, buf)
         and parent:child(parent:child_count() - 1):missing()
     end
   end
-  local node, display = leaf, nil
+  local node, math, branch = leaf, nil, nil
   while node do
     local kind = node:type()
     local _, _, nr, nc = node:range()
@@ -142,22 +149,41 @@ function M.capture(root, row, col, text, buf)
     if kind == "ERROR" and (not parent or node:id() ~= parent:id()) then
       result.upgrade = false
     end
+    if kind == "ERROR" and (not branch or not ordinary_prefix(node, branch, buf)) then
+      return { blocked = true } -- Recovery may have hidden an enclosing math zone.
+    elseif kind == "generic_environment" then
+      local begin = node:field("begin")[1]
+      local name = begin and short_text(begin:field("name")[1], buf)
+      if not name or not text_environments[name:match("^%{(.*)%}$")] then
+        return { blocked = true }
+      end
+    end
     if math_nodes[kind] then
+      result.slash_open = false
       if not parent or node:id() ~= parent:id() then
         result.upgrade = false
       end
-      if kind == "displayed_equation" and not display then
-        display = node
+      if (kind == "displayed_equation" or kind == "inline_formula") and not math then
+        math = node
         local open, close = node:child(0), node:child(node:child_count() - 1)
-        if open:type() == "$$" and close:type() == "$$" and not close:missing() then
+        local expected = ({ ["$$"] = "$$", ["\\("] = "\\)", ["\\["] = "\\]" })[open:type()]
+        if expected and close:type() == expected and not close:missing() then
           local br, bc = open:range()
           local cr, cc = close:range()
-          result.pair = { open_row = br, open_col = bc, close_row = cr, close_col = cc }
+          result.pair = {
+            open = open:type(),
+            close = close:type(),
+            open_row = br,
+            open_col = bc,
+            close_row = cr,
+            close_col = cc,
+          }
         end
-      elseif display then
-        return { blocked = true } -- No nested display inside another math zone.
+      elseif math then
+        return { blocked = true } -- No nested formula inside another math zone.
       end
     end
+    branch = node
     node = node:parent()
   end
   return result

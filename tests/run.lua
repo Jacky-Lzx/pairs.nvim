@@ -1054,6 +1054,15 @@ dofile("tests/tex.lua")({
   plugin = plugin,
 })
 
+dofile("tests/tex_slash.lua")({
+  test = test,
+  input = input,
+  seed = seed,
+  feed = feed,
+  eq = eq,
+  plugin = plugin,
+})
+
 plugin.teardown()
 if #failures > 0 then
   io.stderr:write(table.concat(failures, "\n\n") .. "\n")

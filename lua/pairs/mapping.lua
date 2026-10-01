@@ -43,6 +43,9 @@ function M.attach(config, handler)
     for open, rule in pairs(rules) do
       if rule ~= false then
         keys[open:sub(-1)], keys[rule.close:sub(-1)] = true, true
+        if open == "\\(" or open == "\\[" then
+          keys["\\"] = true -- Skip the first character of a proven TeX closer.
+        end
       end
     end
   end

@@ -64,21 +64,24 @@ local function validate_multi(rules)
         or open == "${"
         or open == "```"
         or open == "~~~"
-        or open == "$$",
+        or open == "$$"
+        or open == "\\("
+        or open == "\\[",
       "pairs: unsupported multi-character delimiter"
     )
     if rule ~= false then
       local fence = open == "```" or open == "~~~"
+      local close = ({ ["${"] = "}", ["\\("] = "\\)", ["\\["] = "\\]" })[open] or open
       if type(rule) == "table" and rule.close == nil then
-        rule.close = open == "${" and "}" or open
+        rule.close = close
       end
       assert(
-        type(rule) == "table" and rule.close == (open == "${" and "}" or open),
+        type(rule) == "table" and rule.close == close,
         "pairs: multi-character closer does not match its rule"
       )
       for _, key in ipairs({ "open", "skip", "delete", "newline" }) do
         if rule[key] == nil then
-          rule[key] = not fence or key ~= "delete"
+          rule[key] = not (fence and key == "delete") and not (open == "\\(" and key == "newline")
         end
         assert(type(rule[key]) == "boolean", "pairs: multi rule." .. key .. " must be boolean")
       end

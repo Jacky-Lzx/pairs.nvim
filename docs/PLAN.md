@@ -191,14 +191,37 @@ native undo/redo/dot. Default/minimal/Python startup smoke, help tags, health,
 formatting and diff checks pass. External LSP responses remain separate
 acceptance work.
 
+## LaTeX backslash-math milestone (implemented)
+
+- Independent opt-in `multi_pairs['\\(']` and `multi_pairs['\\[']`, with
+  implicit matching closers. Preserve ordinary brackets and control sequences.
+- Open after an unescaped backslash in parser-confirmed text; protect existing
+  math, comments, verbatim/code, unknown environments and unsafe recovery nodes.
+- Generalize outer-tree math metadata to complete matching inline/display pairs.
+  Skip both closing characters individually, including the backslash, so typed
+  closers reuse their existing control symbol.
+- Delete adjacent empty math pairs; expand empty display brackets on Enter with
+  base indentation. Inline newline remains native unless explicitly enabled.
+- Register the deferred backslash mapping only when either rule is configured;
+  preserve existing mapping owners and expose composition through expr().
+- Retain action flags, parser/scan-limit fallback, native undo/redo/dot, and
+  enable both rules in the user's tex/plaintex configuration.
+
+Validation: 987 cumulative real-input tests pass on Neovim 0.11.0 and 0.12.5;
+482 pass without optional parser fixtures. The actual configuration passes
+181 input cases with installed VimTeX, blink.cmp completion, LuaSnip placeholders,
+the existing math shortcut and native undo/redo/dot. Default/minimal/Python
+startup smoke, help tags, executable setup examples, health, formatting and
+diff checks pass. External LSP responses remain separate acceptance work.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
    regression case before refining heuristics.
 2. Extend completion/snippet acceptance to more languages and real LSP sources,
    including auto-insert previews and semantic bracket resolution.
-3. Extend LaTeX rules to backslash math delimiters based on concrete input
-   examples. Evaluate ambiguous angle brackets with explicit context and priority.
+3. Refine LaTeX rules from real editing examples, especially custom environments
+   and incomplete command arguments. Evaluate angle brackets with explicit context.
 4. Measure real typing latency before considering caching or incremental scans.
 5. Expand beyond Insert mode only after its behavior has settled.
 

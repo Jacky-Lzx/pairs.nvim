@@ -75,6 +75,12 @@ return function(h)
     "\\begin{custommath}\n$$│\n\\end{custommath}"
   )
   case(
+    "unknown environment closing stays native",
+    "\\begin{custommath}\n$$x│$$\n\\end{custommath}",
+    "$$",
+    "\\begin{custommath}\n$$x$$│$$\n\\end{custommath}"
+  )
+  case(
     "unfinished verbatim remains literal",
     "\\begin{verbatim}\n$│",
     "$",

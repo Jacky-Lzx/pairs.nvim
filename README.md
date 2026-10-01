@@ -5,7 +5,7 @@ first priority. Pure Lua; Neovim 0.11 or newer; no runtime dependencies.
 
 It handles Insert-mode quotes, brackets, matching-closer skipping, empty-pair
 backspace, and empty-bracket expansion on Enter. Python triple quotes,
-JavaScript/TypeScript templates, Markdown fences and LaTeX display dollars are
+JavaScript/TypeScript templates, Markdown fences and LaTeX math delimiters are
 available as opt-in rules. Other multi-character delimiters, wrapping, and command-line mode are
 planned.
 
@@ -330,6 +330,54 @@ flags default to `true`; `false` disables the rule. Global/filetype/buffer
 precedence, native undo/redo/dot and completion-owned Enter composition are the
 same as the other opt-in rules.
 
+## LaTeX backslash math delimiters
+
+Enable inline `\(...\)` and display `\[...\]` independently, with
+`treesitter = true` and the same installed `latex` parser:
+
+```lua
+require("pairs").setup({
+  treesitter = true,
+  filetypes = {
+    tex = { multi_pairs = { ["\\("] = {}, ["\\["] = {} } },
+    plaintex = { multi_pairs = { ["\\("] = {}, ["\\["] = {} } },
+  },
+})
+```
+
+| Before | Input | After |
+| --- | --- | --- |
+| `│` | `\(` | `\(│\)` |
+| `word \│` | `(` | `word \(│\)` |
+| `│` | `\[` | `\[│\]` |
+| `\(x│\)` | `\)` | `\(x\)│` |
+| `\[│\]` | `<BS>` | `│` |
+
+An unescaped backslash prefix opens a pair in parser-confirmed text context,
+when the next character permits pairing. Existing math, comments, literal code,
+unknown environments and unsafe incomplete syntax preserve the original key.
+Opening does not require a standalone line. Ordinary brackets and backslash
+commands keep their usual behavior.
+
+Both characters of a parser-confirmed closer are skipped individually, including
+its backslash. This avoids adding another backslash when typing `\)` or `\]`.
+A bare `)` or `]` before the whole closer remains literal. Adjacent empty pairs
+can be deleted with Backspace. Enter in `\[│\]` produces `\[\n│\n\]`, with
+the opening indentation on the body and closing lines. Inline Enter and Enter
+in nonempty formulas use native buffer behavior by default.
+
+The implicit closers are `"\\)"` and `"\\]"`. `open`, `skip` and `delete` default
+to `true`. `newline` defaults to `false` for `"\\("` and `true` for `"\\["`;
+it can be overridden independently. `false` disables either rule. Existing
+precedence and parser-unavailable fallback apply. Native undo/redo and dot
+retain the complete insertion.
+
+Enabling either rule registers a deferred Insert mapping for `\` as well as its
+bracket keys. Existing mappings are preserved and reported by `status().conflicts`;
+a custom owner can compose `expr("\\")` to use the backslash skip behavior.
+Completion/snippet buffer edits are not re-paired. Keep the existing
+accept → `pairs.expr("<CR>")` → fallback chain when completion owns Enter.
+
 ## Mappings and completion
 
 Setup preserves existing global mappings and leaves buffer mappings alone.
@@ -413,7 +461,7 @@ They cover quotes, nesting, UTF-8 neighbors, backspace, Enter/indentation,
 undo/redo, dot repeat,
 configuration precedence, Python triple quotes and prefixes, JavaScript/TypeScript
 templates, tagged/nested templates and interpolation, Markdown fence boundaries
-and code-language injections, LaTeX display dollars and verbatim/math boundaries,
+and code-language injections, LaTeX math delimiters and verbatim/math boundaries,
 Tree-sitter literal/interpolation boundaries and
 pending parses, completion/snippet-style buffer edits, macro/paste behavior,
 and mapping lifecycle. CI checks the minimum

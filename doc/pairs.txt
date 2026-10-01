@@ -23,7 +23,7 @@ Options:
   treesitter           use installed parsers for syntax context, default false
   disabled_filetypes   list of disabled filetypes
   pairs                table keyed by opening delimiter; false disables a rule
-  multi_pairs          opt-in triples, templates, fences, LaTeX $$; default {}
+  multi_pairs          opt-in triples, templates, fences, LaTeX math; default {}
   filetypes            filetype -> { pairs, multi_pairs, enabled } overrides
 
 Rules contain close (single ASCII character), open, skip, delete, and newline
@@ -192,6 +192,40 @@ close defaults to '$$'. open/skip/delete/newline default to true and are
 independent. false disables the rule. Overrides follow global multi_pairs,
 filetype, then b:pairs_multi_rules. Native undo/redo/dot are preserved. For a
 completion-owned Enter, use accept -> expr('<CR>') -> fallback as usual.
+
+LATEX BACKSLASH MATH                                     *pairs-tex-slash*
+
+Enable inline and display math independently, with the latex parser: >lua
+    require('pairs').setup({
+      treesitter = true,
+      filetypes = {
+        tex = { multi_pairs = { ['\\('] = {}, ['\\['] = {} } },
+        plaintex = { multi_pairs = { ['\\('] = {}, ['\\['] = {} } },
+      },
+    })
+<
+Typing \( produces \(|\); typing \[ produces \[|\]. | denotes the insertion
+cursor. The backslash prefix must be unescaped and parser-confirmed text;
+existing math/comments/literal code, unknown environments and unsafe incomplete
+syntax preserve input. The next character must permit pairing. Opening can
+follow ordinary text; it does not require a standalone display line.
+
+Typing \) or \] at a confirmed closer skips both existing characters one at a
+time, including the backslash. A bare ) or ] before the whole closer remains
+literal. <BS> removes an adjacent empty pair. <CR> in \[|\] creates three lines
+with opening indentation on the body and closer. Inline/nonempty formula Enter
+stays native by default. Undo/redo/dot retain the full insertion.
+
+close defaults to '\\)' or '\\]'. open/skip/delete default to true. newline is
+false for '\\(' and true for '\\[' and can be overridden independently.
+false disables either rule. Precedence and missing/pending parser fallback are
+unchanged. Ordinary brackets and backslash commands keep their usual behavior.
+
+Either rule installs a deferred Insert backslash mapping in addition to the
+bracket keys. Existing mappings are preserved and reported in status().conflicts;
+custom owners can compose expr('\\') to skip the backslash of a proven closer.
+Completion/snippet edits are not re-paired. For completion-owned Enter, use
+accept -> expr('<CR>') -> fallback as usual.
 
 ENTER                                                    *pairs-enter*
 
