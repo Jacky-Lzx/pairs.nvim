@@ -150,14 +150,33 @@ language completion. The configured punctuation undo breaks remain intact.
 Default/minimal/Python startup smoke, help tags, health checks, formatting and
 diff checks pass. External LSP responses remain separate acceptance work.
 
+## Markdown fence family milestone (implemented)
+
+- Extend the existing backtick family to any opening length >= 3 and add an
+  independent opt-in tilde family through multi_pairs['~~~'].
+- Generate closers with the opening character and exact length. Reuse/skip
+  only parser-confirmed closers of the same character and sufficient length.
+- Preserve shorter/different-character lines as content. Apply the backtick
+  restriction to backtick info strings while allowing backticks in tilde info.
+- Retain container prefixes, injected-code boundaries, native undo/redo/dot,
+  disabled-family isolation and original-key fallback without current context.
+- Enable both families in the user's local Markdown configuration.
+
+Validation: 795 cumulative tests pass on Neovim 0.11.0 and 0.12.5; 470 pass
+without extra parser fixtures. The actual
+configuration passes 139 input cases with blink.cmp confirmation, language
+completion, LuaSnip, native undo/redo/dot, and existing closer reuse.
+Default/minimal/Python startup smoke, help tags, health, formatting and diff
+checks pass. External LSP responses remain separate acceptance work.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
    regression case before refining heuristics.
 2. Extend completion/snippet acceptance to more languages and real LSP sources,
    including auto-insert previews and semantic bracket resolution.
-3. Extend Markdown fences to longer/tilde openers, then add opt-in LaTeX rules.
-   Evaluate ambiguous angle brackets with explicit context and priority.
+3. Add opt-in LaTeX rules. Evaluate ambiguous angle brackets with explicit
+   context and priority.
 4. Measure real typing latency before considering caching or incremental scans.
 5. Expand beyond Insert mode only after its behavior has settled.
 

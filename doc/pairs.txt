@@ -109,22 +109,27 @@ MARKDOWN CODE FENCES                                      *pairs-fences*
 Opt-in, with treesitter=true and an installed Markdown parser: >lua
     require('pairs').setup({
       treesitter = true,
-      filetypes = { markdown = { multi_pairs = { ['```'] = {} } } },
+      filetypes = {
+        markdown = { multi_pairs = { ['```'] = {}, ['~~~'] = {} } },
+      },
     })
 <
-At the end of a new opening line with exactly three backticks and an optional
-language/info string, <CR> adds a middle and closing line. The cursor remains
+At the end of a new opening line with three or more backticks/tildes and an
+optional language/info string, <CR> adds a middle and closing line. The cursor remains
 on the middle line. The info string is retained; both lines use the opening
 line's indentation, which may contain zero to three spaces relative to a
-containing list/quote.
+containing list/quote. The generated closer matches the opening character and
+exact length.
 
 Existing body content or a closing fence inserts one line, preserving the
 block. Within a container, that line receives the continuation prefix.
-At a confirmed closing delimiter, each backtick skips one character. Longer
-closing fences are recognized. The outer Markdown tree owns these boundaries
-even when the body has an injected code-language parser.
+At a confirmed closing delimiter, each delimiter character skips one position.
+An existing closer must use the same character and be at least as long as its
+opener. Shorter/different-character lines remain body content.
+The outer Markdown tree owns these boundaries even when the body has an
+injected code-language parser.
 
-Triple-backtick openers work at the top level, in lists/block quotes and in
+Backtick and tilde openers work at the top level, in lists/block quotes and in
 nested combinations. List markers become continuation indentation; quote
 markers remain. For example, Enter after '> - ```lua' creates: >
     > - ```lua
@@ -135,13 +140,17 @@ The | represents the cursor. Prefix tabs become spaces at Markdown's four-column
 tab stops, independently of buffer tabstop/expandtab. Native comment leaders
 and indentexpr do not duplicate or change the generated prefix.
 
-Inline code, HTML, indented code relative to its container, longer/tilde openers
-and task-marker text retain ordinary input. Inline backtick pairing is not
+Inline code, HTML, indented code relative to its container and task-marker text
+retain ordinary input. Inline backtick pairing is not
 enabled. Enter inside the info string or existing body stays native. See
 CommonMark 4.5, 5.1 and 5.2 for the syntax contract.
+Backtick-fence info may not contain backticks; tilde-fence info may contain them.
 
-close defaults to '```'; open/newline/skip default to true. Expansion requires
-both open and newline. false disables the rule. Overrides follow global,
+multi_pairs['```'] and multi_pairs['~~~'] configure independent families for
+all opening lengths >= 3. Longer configuration keys are rejected. close defaults
+to the family key; generated closing text matches the actual opening length.
+open/newline/skip default to true. Expansion requires both open and newline.
+false disables that family. Overrides follow global,
 filetype, then b:pairs_multi_rules. Backspace stays ordinary; delete=true is
 unsupported and rejected. Undo/redo and dot retain the complete insertion.
 Missing/pending parser context preserves original keys.

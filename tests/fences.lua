@@ -71,8 +71,8 @@ return function(h)
   case("inline code", "text `code ```│`", "<CR>", "text `code ```\n│`")
   case("ordinary text", "text ```│", "<CR>", "text ```\n│")
   case("invalid info string with backtick", "```py`bad│", "<CR>", "```py`bad\n│")
-  case("four-backtick opener remains literal", "````│", "<CR>", "````\n│")
-  case("tilde opener remains literal", "~~~│", "<CR>", "~~~\n│")
+  case("four-backtick opener expands", "````│", "<CR>", "````\n│\n````")
+  case("tilde opener remains opt-in", "~~~│", "<CR>", "~~~\n│")
   case("backticks are typed literally before Enter", "│", "```lua", "```lua│")
   case("Enter in middle of info string", "```py│thon", "<CR>", "```py\n│thon")
   case("Enter before trailing whitespace", "```lua│  ", "<CR>", "```lua\n│")
@@ -193,8 +193,8 @@ return function(h)
     "<CR>",
     "> <div>\n> ```\n│\n> </div>"
   )
-  case("longer quote opener remains literal", "> ````│", "<CR>", "> ````\n│")
-  case("tilde list opener remains literal", "- ~~~│", "<CR>", "- ~~~\n│")
+  case("longer quote opener expands", "> ````│", "<CR>", "> ````\n> │\n> ````")
+  case("tilde list opener remains opt-in", "- ~~~│", "<CR>", "- ~~~\n│")
   case(
     "relative four spaces are code",
     "- item\n      ```│",

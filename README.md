@@ -219,31 +219,36 @@ Rules follow the [ECMAScript template syntax](https://tc39.es/ecma262/multipage/
 
 ## Markdown code fences
 
-Enable the triple-backtick fence rule with an installed Markdown parser:
+Enable either fence family with an installed Markdown parser:
 
 ```lua
 require("pairs").setup({
   treesitter = true,
-  filetypes = { markdown = { multi_pairs = { ["```"] = {} } } },
+  filetypes = {
+    markdown = { multi_pairs = { ["```"] = {}, ["~~~"] = {} } },
+  },
 })
 ```
 
-At the end of a new opening line, type three backticks and an optional language
-name, then press Enter. The plugin creates a blank middle line and a matching
-closing line, placing the cursor on the middle line. The language/info string
-is preserved. Content and closing indentation match the opening line, including
+At the end of a new opening line, type three or more backticks or tildes and an
+optional language name, then press Enter. The plugin creates a blank middle line
+and a matching closing line, placing the cursor on the middle line. The language/info string
+is preserved. The new closing fence uses the opening character and exact length.
+Content and closing indentation match the opening line, including
 its zero to three spaces of indentation relative to any containing list/quote.
 
 An opening line with existing code content or a closing fence inserts a single
 line, keeping the existing block intact. Within a list or quote, the new line
 receives the container's continuation prefix. Closing fences are skipped one
-backtick at a time only at parser-confirmed closing positions; longer closing
-fences are recognized. Markdown's outer block tree owns these positions even
-when the body has an injected code-language parser.
+character at a time only at parser-confirmed closing positions. Existing closing
+fences must use the same character and be at least as long as the opening fence;
+shorter or different-character lines remain code content.
+Markdown's outer block tree owns these positions even when the body has an
+injected code-language parser.
 
-The rule is opt-in and supports exactly three opening backticks at the top level,
-inside lists and block quotes, and in nested combinations. List markers become
-continuation indentation; quote markers remain on the body and closing lines.
+Both families are opt-in and support any opening length of at least three at
+the top level, inside lists and block quotes, and in nested combinations. List
+markers become continuation indentation; quote markers remain on the body and closing lines.
 For example, Enter after `> - ```lua` creates:
 
 ````markdown
@@ -258,14 +263,19 @@ buffer's `tabstop`/`expandtab`. Native comment continuation and `indentexpr` do
 not duplicate or change the generated prefix.
 
 Inline code, HTML blocks, four-space indented code relative to its container,
-longer/tilde openers, task-marker text, and Enter within the info string keep their
+task-marker text, and Enter within the info string keep their
 ordinary input behavior. The rule does not enable inline backtick pairing.
+Backtick-fence info strings cannot contain backticks; tilde-fence info strings
+may contain them.
 Enter within existing code content remains native buffer behavior.
 Its context checks follow [CommonMark fence syntax](https://spec.commonmark.org/0.31.2/#fenced-code-blocks).
 
-`multi_pairs["```"]` has implicit `close = "```"`; `open`, `newline` and `skip`
-default to `true`. Both `open` and `newline` must be enabled for expansion.
-`false` disables the entire rule. Global/filetype/`vim.b.pairs_multi_rules`
+The configuration keys `multi_pairs["```"]` and `multi_pairs["~~~"]` identify
+families, covering all lengths. Longer configuration keys are rejected. Each
+rule has an implicit `close` matching its family key; the generated closing text
+always matches the actual opening length. `open`, `newline` and `skip` default
+to `true`. Both `open` and `newline` must be enabled for expansion.
+`false` disables that family independently. Global/filetype/`vim.b.pairs_multi_rules`
 precedence is unchanged. Backspace remains ordinary deletion; `delete = true`
 is unsupported and rejected. Undo/redo and dot repeat retain the entire
 insertion. Missing/pending parser context preserves the original key.

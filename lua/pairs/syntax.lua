@@ -143,7 +143,11 @@ local function markdown_fence(buf, parser, range)
       end
       local row, col = opening:range()
       local text = line(buf, row)
-      local indent, ticks = text:sub(col + 1):match("^([ \t]*)(`+)[^`]*$")
+      local suffix = text:sub(col + 1)
+      local indent, delimiter = suffix:match("^([ \t]*)(`+)[^`]*$")
+      if not indent then
+        indent, delimiter = suffix:match("^([ \t]*)(~+).*$")
+      end
       local prefix, containers
       if
         indent
@@ -153,7 +157,8 @@ local function markdown_fence(buf, parser, range)
       end
       local result = {
         open_row = row,
-        supported = prefix ~= nil and ticks == "```",
+        supported = prefix ~= nil and #delimiter >= 3,
+        delimiter = delimiter,
         prefix = containers and prefix or nil,
         has_content = false,
       }
@@ -179,10 +184,13 @@ local function markdown_fence(buf, parser, range)
             base = ec
           end
         end
-        local spaces, run = closing:sub(base + 1):match("^([ \t]*)(`+)[ \t]*$")
+        local char = delimiter and delimiter:sub(1, 1)
+        local pattern = char == "~" and "^([ \t]*)(~+)[ \t]*$" or "^([ \t]*)(`+)[ \t]*$"
+        local spaces, run = closing:sub(base + 1):match(pattern)
         if
           spaces
-          and #run >= 3
+          and delimiter
+          and #run >= #delimiter
           and base + #spaces >= cc
           and markdown_columns(closing:sub(1, base + #spaces))
               - markdown_columns(closing:sub(1, base))
