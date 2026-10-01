@@ -10,25 +10,43 @@
 - Optional valid Tree-sitter context and inspectable decisions.
 - Real Neovim regression tests, help, health, and local installation instructions.
 
-Validation: 108 regression tests passed on Neovim 0.11.0 and 0.12.5 on macOS
-arm64. Help lookup, health output, and StyLua formatting passed. Completion and
-snippet tests exercise buffer-edit contracts; actual blink.cmp/LuaSnip sessions
-have not been verified. The user's active Neovim configuration is not changed.
+Validation: the initial suite contained 108 real-input cases on Neovim 0.11.0
+and 0.12.5 on macOS arm64. The local plugin is loaded by the user's Neovim
+configuration in place of mini.pairs/nvim-autopairs.
+
+## Enter milestone (implemented)
+
+- Empty-bracket expansion, independent per-rule `newline` and `mappings.cr`.
+- Language indentation using `indentexpr`/`cindent`, or shiftwidth fallback.
+- Tabs, variable tab stops, nesting, and existing mapping ownership.
+- Native undo/redo and complete multiline dot repeat, including counted repeat.
+- Explicit blink.cmp Enter composition: accept, pairs.expr, native fallback.
+
+The mapping returns native typed commands. A temporary isolated word on the
+middle line allows Ctrl-Left to return across a newline without splitting the
+insertion record; native Delete removes it. Indentation is evaluated through the
+expression register and returned as typed whitespace so dot captures it. No
+buffer text edits or override of the user's dot mapping are required. Language
+indent callbacks have their cursor/view and v:lnum restored.
+
+Validation: 149 regression tests pass on Neovim 0.11.0 and 0.12.5, including
+actual Lua/Python indent functions, C indentation, undo/redo, dot and tabs.
+The active Neovim configuration also passed startup smoke for default/minimal/
+Python profiles and a real blink.cmp acceptance session: Enter priority, function
+auto-brackets, LuaSnip acceptance/placeholder navigation, and Enter undo/dot.
+Only a deterministic completion source was injected for this session; blink.cmp
+and LuaSnip themselves were the installed plugins.
 
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
    regression case before refining heuristics.
-2. Add Enter expansion with language indentation. It must preserve both undo
-   grouping and the complete multiline insertion under `.`. Do not ship the
-   direct buffer-edit prototype: it preserved undo but omitted those edits
-   from dot replay. `<CR><C-o>O` also replayed only the last insertion segment.
-3. Verify actual blink.cmp and LuaSnip behavior in an isolated real configuration,
-   including auto-brackets, snippets, placeholder navigation, and load order.
-4. Add opt-in language rules for Python triple quotes, Markdown fences, LaTeX,
+2. Extend completion/snippet acceptance to more languages and real LSP sources,
+   including auto-insert previews and semantic bracket resolution.
+3. Add opt-in language rules for Python triple quotes, Markdown fences, LaTeX,
    and ambiguous angle brackets, with an explicit context/priority contract.
-5. Measure real typing latency before considering caching or incremental scans.
-6. Expand beyond Insert mode only after its behavior has settled.
+4. Measure real typing latency before considering caching or incremental scans.
+5. Expand beyond Insert mode only after its behavior has settled.
 
 Every milestone should pass the cumulative regression suite before a focused
 commit. No publishing/push is part of local implementation.

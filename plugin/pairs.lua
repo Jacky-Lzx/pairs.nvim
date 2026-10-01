@@ -14,6 +14,6 @@ end, {
   nargs = 1,
   desc = "Explain insertion before the cursor without editing text",
   complete = function()
-    return { '"', "'", "(", ")", "[", "]", "{", "}", "<BS>" }
+    return { '"', "'", "(", ")", "[", "]", "{", "}", "<BS>", "<CR>" }
   end,
 })

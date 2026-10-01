@@ -25,7 +25,7 @@ function M.check()
   else
     vim.health.ok("No global mapping conflicts during setup")
   end
-  vim.health.info("Enter/Tab are not mapped. Tree-sitter is optional; see :help pairs.nvim")
+  vim.health.info("Enter expansion is configurable; Tab is not mapped. See :help pairs-enter")
 end
 
 return M

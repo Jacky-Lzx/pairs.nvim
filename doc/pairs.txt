@@ -11,25 +11,42 @@ Disable other auto-pairs plugins, then: >lua
     })
 <
 Handles Insert-mode (), [], {}, double and single quotes, matching closer
-skipping, and empty-pair <BS>. <CR>/<Tab> and other modes are not mapped.
+skipping, empty-pair <BS>, and empty-bracket expansion on <CR>.
+<Tab> and other modes are not mapped.
 
 Options:
   enabled              boolean or function(bufnr), default true
   mappings.enabled     install mappings, default true
   mappings.bs          install <BS> mapping, default true
+  mappings.cr          install <CR> mapping, default true
   max_scan_bytes       maximum line prefix to scan, default 4096
   treesitter           consult valid existing trees, default false
   disabled_filetypes   list of disabled filetypes
   pairs                table keyed by opening delimiter; false disables a rule
   filetypes            filetype -> { pairs = overrides, enabled = boolean }
 
-Rules contain close (single ASCII character), open, skip, delete (booleans).
-Actions default to true for new rules. Overrides are merged with defaults.
+Rules contain close (single ASCII character), open, skip, delete, and newline
+(booleans). Open/skip/delete default to true for new rules. Newline defaults
+to true for asymmetric pairs; symmetric quotes never expand. Overrides merge
+with defaults.
 Closing delimiters must be unique. Multi-character delimiters are unsupported.
 Single-quote opening defaults to false in text, markdown, and rust.
 
 Buffer overrides use b:pairs_enabled and b:pairs_rules. Buffer rules override
 global and filetype rules; newly introduced delimiters need explicit mappings.
+
+ENTER                                                    *pairs-enter*
+
+<CR> between adjacent empty brackets creates an indented middle line and a
+closing line. Strings, comments, quotes and nonempty pairs pass through.
+Indentation uses indentexpr or cindent when configured. Otherwise it adds one
+shiftwidth to the opening line and aligns the closer with that line. Tabs and
+vartabstop are respected. Undo, redo and dot repeat retain the entire insertion;
+dot replays the resulting indentation from the original insertion.
+
+Existing Enter mappings are preserved. For a completion-owned Enter, set
+mappings.cr=false and compose expr('<CR>') after completion confirmation and
+before the owner's native fallback. See the blink.cmp example in README.md.
 
 API                                                      *pairs-api*
 
@@ -45,7 +62,7 @@ toggle([bufnr])        Toggle globally, or toggle one buffer.
 status()              Initialization, global enabled state, mapping conflicts.
 teardown()            Remove only mappings still owned by this plugin.
 
-Use key notation such as '<BS>'. expr()/handle() return termcodes; mappings
+Use key notation such as '<BS>' or '<CR>'. expr()/handle() return termcodes; mappings
 should use { expr = true, replace_keycodes = false }.
 
 COMMANDS                                                 *pairs-commands*
@@ -70,7 +87,6 @@ Existing global mappings are preserved; buffer mappings take precedence.
 Paste, macro recording/replay, Replace mode, and special buffers bypass pairing.
 Runtime context errors pass through and are exposed by explain().
 
-Enter expansion, multi-character pairs, wrapping and command-line mode are
-planned. See README.md and docs/PLAN.md in the checkout for details.
+Multi-character pairs, wrapping and command-line mode are planned. See README.md and docs/PLAN.md in the checkout for details.
 
  vim:tw=78:ts=8:ft=help:norl:

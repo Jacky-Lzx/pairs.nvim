@@ -3,10 +3,9 @@
 A small, conservative auto-pairs plugin for Neovim, with quote behavior as the
 first priority. Pure Lua; Neovim 0.11 or newer; no runtime dependencies.
 
-This is an initial implementation. It handles Insert-mode quotes, brackets,
-matching-closer skipping, and empty-pair backspace. Pair expansion on Enter,
-multi-character delimiters, wrapping, and command-line mode are planned rather
-than implemented.
+It handles Insert-mode quotes, brackets, matching-closer skipping, empty-pair
+backspace, and empty-bracket expansion on Enter. Multi-character delimiters,
+wrapping, and command-line mode are planned.
 
 ## Local installation
 
@@ -66,15 +65,16 @@ Requiring the module alone does not install mappings.
 ```lua
 require("pairs").setup({
   enabled = true, -- or function(bufnr) return true end
-  mappings = { enabled = true, bs = true },
+  mappings = { enabled = true, bs = true, cr = true },
   treesitter = false,
   max_scan_bytes = 4096,
   disabled_filetypes = { "TelescopePrompt", "snacks_picker_input" },
   pairs = {
     ["'"] = { open = false }, -- keep skip/delete, disable quote insertion
     ["("] = { skip = false },
+    ["{"] = { newline = false }, -- disable Enter expansion for braces
     ["["] = false,           -- disable this entire rule
-    -- Additional pairs are opt-in. All three actions default to true.
+    -- Additional pairs are opt-in. Asymmetric rules also enable newline.
     ["<"] = { close = ">", open = true, skip = true, delete = true },
   },
   filetypes = {
@@ -120,10 +120,34 @@ Setup preserves existing global mappings and leaves buffer mappings alone.
 pairs plugin instead of running two mapping owners together. Setup is
 idempotent; teardown removes only mappings still owned by this plugin.
 
-`<CR>` and `<Tab>` are never mapped. Completion confirmation and snippet
-navigation therefore remain with their existing owners. Completion-provided
-brackets are not automatically duplicated: only mapped typed keys create pairs.
-Run `:checkhealth pairs` to inspect initialization and mapping conflicts.
+`<CR>` expands adjacent empty `()`, `[]`, and `{}` into three lines, leaving the
+cursor on the indented middle line. Quotes, strings, comments, nonempty pairs,
+and ordinary newlines pass through. The plugin uses the buffer's `indentexpr`
+or `cindent` when configured; otherwise it adds one `shiftwidth` to the opening
+line's indentation and aligns the closing line with it. Tabs and `vartabstop`
+are respected. Undo/redo and `.` retain the entire multiline insertion; dot
+replays the indentation produced by the original insertion.
+
+`<Tab>` is never mapped. Existing Enter mappings are preserved. When a
+completion plugin owns Enter, disable this plugin's Enter mapping and compose
+`expr("<CR>")` into that owner's fallback chain. For blink.cmp:
+
+```lua
+-- pairs.nvim options
+require("pairs").setup({ mappings = { cr = false } })
+-- blink.cmp options
+keymap = {
+  ["<CR>"] = {
+    "accept",
+    function() return require("pairs").expr("<CR>") end,
+    "fallback",
+  },
+}
+```
+
+Completion-provided brackets are not automatically duplicated: only mapped
+typed keys create pairs. Run `:checkhealth pairs` to inspect initialization and
+mapping conflicts.
 
 For an explicitly composed mapping:
 
@@ -143,7 +167,7 @@ end, { expr = true, replace_keycodes = false })
   number (`0` for current) to control one buffer.
 - `teardown()` removes the plugin's mappings.
 
-Use key notation such as `<BS>` for special keys. Returned keycodes should be
+Use key notation such as `<BS>` or `<CR>` for special keys. Returned keycodes should be
 used with `replace_keycodes = false` to avoid a second conversion. Insert
 movement uses `<C-g>U` so generating/skipping a closer stays in the same undo
 block and ordinary insertions remain dot-repeatable. Paste, macro recording
@@ -157,7 +181,8 @@ stylua --check lua tests plugin
 ```
 
 Tests use actual Neovim input and cursor positions in isolated XDG directories.
-They cover quotes, nesting, UTF-8 neighbors, backspace, undo/redo, dot repeat,
+They cover quotes, nesting, UTF-8 neighbors, backspace, Enter/indentation,
+undo/redo, dot repeat,
 configuration precedence, optional Tree-sitter, completion/snippet-style buffer
 edits, macro/paste behavior, and mapping lifecycle. CI checks the minimum
 supported version and the current stable version. Real blink.cmp/LuaSnip

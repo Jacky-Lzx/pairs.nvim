@@ -31,6 +31,12 @@ local function seed(marked, ft)
   vim.bo.expandtab = true
   vim.bo.shiftwidth = 2
   vim.bo.tabstop = 4
+  vim.bo.vartabstop = ""
+  vim.bo.indentexpr = ""
+  vim.bo.cindent = false
+  vim.bo.smartindent = false
+  vim.bo.indentkeys = "0{,0},0),0],:,0#,!^F,o,O,e"
+  vim.bo.cinkeys = "0{,0},0),0],:,0#,!^F,o,O,e"
   vim.b.pairs_rules = nil
   vim.b.pairs_enabled = nil
   local start = assert(marked:find("│", 1, true), "missing cursor marker")
@@ -55,9 +61,12 @@ _G.pairs_test_capture = function()
   _G.pairs_test_mode = vim.fn.mode()
 end
 
-local function input(before, keys, after, opts, ft)
+local function input(before, keys, after, opts, ft, buffer_options)
   local entry = seed(before, ft)
   plugin.setup(opts)
+  for name, value in pairs(buffer_options or {}) do
+    vim.bo[name] = value
+  end
   feed(entry .. keys .. "<Cmd>lua pairs_test_capture()<CR><Esc>")
   eq(_G.pairs_test_result, after)
   eq(_G.pairs_test_mode, "i")
@@ -179,6 +188,251 @@ for _, case in ipairs(cases) do
     input(case[2], case[3], case[4], case[5], case[6])
   end)
 end
+
+local newline_cases = {
+  { "brace expansion", "{│}", "<CR>", "{\n  │\n}" },
+  { "parenthesis expansion", "(│)", "<CR>", "(\n  │\n)" },
+  { "square expansion", "[│]", "<CR>", "[\n  │\n]" },
+  { "indented expansion", "  {│}", "<CR>", "  {\n    │\n  }" },
+  { "surrounding text preserved", "fn({│});", "<CR>", "fn({\n  │\n});" },
+  { "continuous expansion", "│", "{<CR>body", "{\n  body│\n}" },
+  { "nested expansion", "│", "{<CR>[<CR>body", "{\n  [\n    body│\n  ]\n}" },
+  { "quotes do not expand", '"│"', "<CR>", '"\n│"' },
+  { "single quotes do not expand", "'│'", "<CR>", "'\n│'" },
+  { "string brackets do not expand", '"{│}"', "<CR>", '"{\n│}"' },
+  { "comment brackets do not expand", "-- {│}", "<CR>", "-- {\n-- │}" },
+  { "escaped pair does not expand", "\\{│}", "<CR>", "\\{\n│}" },
+  { "nonempty pair does not expand", "{body│}", "<CR>", "{body\n│}" },
+  { "ordinary newline fallback", "word│", "<CR>", "word\n│" },
+  {
+    "disabled newline rule",
+    "{│}",
+    "<CR>",
+    "{\n│}",
+    { pairs = { ["{"] = { newline = false } } },
+  },
+  { "disabled CR mapping", "{│}", "<CR>", "{\n│}", { mappings = { cr = false } } },
+  { "disabled plugin does not expand", "{│}", "<CR>", "{\n│}", { enabled = false } },
+  {
+    "filetype newline override",
+    "{│}",
+    "<CR>",
+    "{\n│}",
+    { filetypes = { lua = { pairs = { ["{"] = { newline = false } } } } },
+  },
+  {
+    "tabs",
+    "\t{│}",
+    "<CR>",
+    "\t{\n\t\t│\n\t}",
+    nil,
+    nil,
+    { expandtab = false, shiftwidth = 4 },
+  },
+  {
+    "zero shiftwidth",
+    "{│}",
+    "<CR>",
+    "{\n\t│\n}",
+    nil,
+    nil,
+    { expandtab = false, shiftwidth = 0 },
+  },
+  {
+    "variable tabstops",
+    "\t{│}",
+    "<CR>",
+    "\t{\n\t\t│\n\t}",
+    nil,
+    nil,
+    { expandtab = false, shiftwidth = 4, vartabstop = "2,4" },
+  },
+  {
+    "autoindent disabled",
+    "  {│}",
+    "<CR>",
+    "  {\n    │\n  }",
+    nil,
+    nil,
+    { autoindent = false },
+  },
+  { "unusual iskeyword", "{│}", "<CR>", "{\n  │\n}", nil, nil, { iskeyword = "@,48-57,_,^x" } },
+  {
+    "small textwidth",
+    "{│}",
+    "<CR>",
+    "{\n  │\n}",
+    nil,
+    nil,
+    { textwidth = 3, formatoptions = "t" },
+  },
+}
+for _, case in ipairs(newline_cases) do
+  test("newline: " .. case[1], function()
+    input(case[2], case[3], case[4], case[5], case[6], case[7])
+  end)
+end
+
+test("newline: undo and redo entire insertion", function()
+  input("│", "{<CR>body", "{\n  body│\n}")
+  feed("u")
+  eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "" })
+  feed("<C-r>")
+  eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "{", "  body", "}" })
+end)
+
+test("newline: complete dot repeat", function()
+  input("│", "{<CR>body", "{\n  body│\n}")
+  feed("gg0.")
+  eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "{", "  body", "}{", "  body", "}" })
+  feed("u")
+  eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "{", "  body", "}" })
+end)
+
+test("newline: counted dot repeat", function()
+  input("│", "{<CR>body", "{\n  body│\n}")
+  feed("gg02.")
+  eq(
+    vim.api.nvim_buf_get_lines(0, 0, -1, false),
+    { "{", "  body{", "  body", "}", "}{", "  body", "}" }
+  )
+end)
+
+test("newline: buffer override", function()
+  local entry = seed("{│}")
+  plugin.setup()
+  vim.b.pairs_rules = { ["{"] = { newline = false } }
+  feed(entry .. "<CR><Cmd>lua pairs_test_capture()<CR><Esc>")
+  eq(_G.pairs_test_result, "{\n│}")
+end)
+
+test("newline: composed Enter keeps undo and dot", function()
+  local entry = seed("│")
+  plugin.setup({ mappings = { cr = false } })
+  vim.keymap.set("i", "<CR>", function()
+    return plugin.expr("<CR>") or require("pairs.mapping").keycode("<CR>")
+  end, { expr = true, replace_keycodes = false, desc = "completion owner" })
+  feed(entry .. "{<CR>body<Cmd>lua pairs_test_capture()<CR><Esc>")
+  eq(_G.pairs_test_result, "{\n  body│\n}")
+  feed("u")
+  eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "" })
+  feed("<C-r>gg0.")
+  eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "{", "  body", "}{", "  body", "}" })
+  plugin.teardown()
+  eq(vim.fn.maparg("<CR>", "i", false, true).desc, "completion owner")
+  vim.keymap.del("i", "<CR>")
+end)
+
+test("newline: symmetric rules never expand", function()
+  input('"│"', "<CR>", '"\n│"', { pairs = { ['"'] = { newline = true } } })
+end)
+
+test("newline: temporary word does not expand abbreviations", function()
+  vim.cmd("iabbrev x EXPANDED")
+  local ok, err = pcall(input, "{│}", "<CR>", "{\n  │\n}")
+  vim.cmd("iunabbrev x")
+  assert(ok, err)
+end)
+
+_G.pairs_test_indent = function()
+  return vim.fn.getline(vim.v.lnum):match("^%s*[}%]%)]") and 0 or 4
+end
+
+test("newline: indentexpr indentation", function()
+  input("{│}", "<CR>", "{\n    │\n}", nil, nil, { indentexpr = "v:lua.pairs_test_indent()" })
+end)
+
+test("newline: indentexpr without reindent key", function()
+  input(
+    "{│}",
+    "<CR>",
+    "{\n    │\n}",
+    nil,
+    nil,
+    { indentexpr = "v:lua.pairs_test_indent()", indentkeys = "o,O" }
+  )
+end)
+
+test("newline: cindent", function()
+  input("{│}", "<CR>", "{\n  │\n}", nil, "c", { cindent = true })
+end)
+
+test("newline: builtin Lua indentation and dot", function()
+  local entry = seed("│")
+  plugin.setup()
+  vim.b.did_indent = nil
+  vim.cmd("runtime indent/lua.vim")
+  feed(entry .. "local x = {<CR>value<Cmd>lua pairs_test_capture()<CR><Esc>")
+  eq(_G.pairs_test_result, "local x = {\n  value│\n}")
+  feed("gg0.")
+  eq(
+    vim.api.nvim_buf_get_lines(0, 0, -1, false),
+    { "local x = {", "  value", "}local x = {", "  value", "}" }
+  )
+end)
+
+test("newline: builtin Python continuation indentation", function()
+  local entry = seed("value = (│)", "python")
+  plugin.setup()
+  vim.b.did_indent = nil
+  vim.cmd("runtime indent/python.vim")
+  feed(entry .. "<CR>item<Cmd>lua pairs_test_capture()<CR><Esc>")
+  eq(_G.pairs_test_result, "value = (\n    item│\n    )")
+end)
+
+test("newline: cindent undo and complete dot", function()
+  input("│", "{<CR>body", "{\n  body│\n}", nil, "c", { cindent = true })
+  feed("u")
+  eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "" })
+  feed("<C-r>gg0.")
+  eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "{", "  body", "}{", "  body", "}" })
+end)
+
+test("newline: literal tabs survive dot repeat", function()
+  input(
+    "│",
+    "{<CR>body",
+    "{\n\tbody│\n}",
+    nil,
+    nil,
+    { expandtab = false, shiftwidth = 4, softtabstop = 2 }
+  )
+  feed("gg0.")
+  eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "{", "\tbody", "}{", "\tbody", "}" })
+end)
+
+test("newline: custom indentexpr replay", function()
+  input(
+    "│",
+    "{<CR>body",
+    "{\n    body│\n}",
+    nil,
+    nil,
+    { indentexpr = "v:lua.pairs_test_indent()", indentkeys = "o,O" }
+  )
+  feed("gg0.")
+  eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), { "{", "    body", "}{", "    body", "}" })
+end)
+
+test("newline: raw string passthrough with Tree-sitter", function()
+  local entry = seed("local s = [[\n{│}\n]]")
+  plugin.setup({ treesitter = true })
+  vim.treesitter.get_parser(0, "lua"):parse()
+  feed(entry .. "<CR><Cmd>lua pairs_test_capture()<CR><Esc>")
+  eq(_G.pairs_test_result, "local s = [[\n{\n│}\n]]")
+end)
+
+test("newline: expression callback retains v:lnum and options", function()
+  local entry = seed("{│}")
+  plugin.setup()
+  vim.bo.indentexpr = "v:lua.pairs_test_indent()"
+  vim.bo.indentkeys = "o,O"
+  local old_lnum = vim.v.lnum
+  feed(entry .. "<CR><Cmd>lua pairs_test_capture()<CR><Esc>")
+  eq(vim.v.lnum, old_lnum)
+  eq(vim.bo.indentexpr, "v:lua.pairs_test_indent()")
+  eq(vim.bo.indentkeys, "o,O")
+end)
 
 test("opening cursor movement preserves undo", function()
   input("seed │", '("abc")', 'seed ("abc")│')

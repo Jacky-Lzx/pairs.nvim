@@ -38,7 +38,7 @@ function M.decide(ctx, key)
   end
   local prev, next_char = lex.previous(ctx.line, ctx.col), lex.next(ctx.line, ctx.col)
 
-  if key == "<BS>" then
+  if key == "<BS>" or key == "<CR>" then
     local rule = ctx.rules[prev]
     if not rule or rule == false or next_char ~= rule.close then
       return decision("pass", "not_empty_pair")
@@ -63,6 +63,9 @@ function M.decide(ctx, key)
     end
     if key == "<BS>" and rule.delete then
       return decision("delete", "empty_pair", prev, rule.close)
+    end
+    if key == "<CR>" and rule.newline and prev ~= rule.close then
+      return decision("newline", "empty_pair", prev, rule.close)
     end
     return decision("pass", "action_disabled")
   end

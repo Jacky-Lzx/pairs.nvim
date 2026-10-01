@@ -41,6 +41,9 @@ function M.attach(config, handler)
   if config.mappings.bs then
     keys["<BS>"] = true
   end
+  if config.mappings.cr then
+    keys["<CR>"] = true
+  end
   for _, lhs in ipairs(vim.tbl_keys(keys)) do
     if global_mapping(lhs) then
       M.conflicts[#M.conflicts + 1] = lhs
@@ -67,6 +70,8 @@ function M.render(result)
     return keycode("<C-g>U<Right>")
   elseif result.action == "delete" then
     return keycode("<BS><Del>")
+  elseif result.action == "newline" then
+    return require("pairs.newline").keys()
   end
 end
 

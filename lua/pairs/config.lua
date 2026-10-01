@@ -2,16 +2,16 @@ local M = {}
 
 M.defaults = {
   enabled = true,
-  mappings = { enabled = true, bs = true },
+  mappings = { enabled = true, bs = true, cr = true },
   max_scan_bytes = 4096,
   treesitter = false,
   disabled_filetypes = { "TelescopePrompt", "snacks_picker_input" },
   pairs = {
-    ["("] = { close = ")", open = true, skip = true, delete = true },
-    ["["] = { close = "]", open = true, skip = true, delete = true },
-    ["{"] = { close = "}", open = true, skip = true, delete = true },
-    ['"'] = { close = '"', open = true, skip = true, delete = true },
-    ["'"] = { close = "'", open = true, skip = true, delete = true },
+    ["("] = { close = ")", open = true, skip = true, delete = true, newline = true },
+    ["["] = { close = "]", open = true, skip = true, delete = true, newline = true },
+    ["{"] = { close = "}", open = true, skip = true, delete = true, newline = true },
+    ['"'] = { close = '"', open = true, skip = true, delete = true, newline = false },
+    ["'"] = { close = "'", open = true, skip = true, delete = true, newline = false },
   },
   filetypes = {
     text = { pairs = { ["'"] = { open = false } } },
@@ -37,9 +37,9 @@ local function validate_pairs(rules)
           and rule.close:byte() < 127,
         "pairs: closing delimiters must be single printable ASCII characters"
       )
-      for _, key in ipairs({ "open", "skip", "delete" }) do
+      for _, key in ipairs({ "open", "skip", "delete", "newline" }) do
         if rule[key] == nil then
-          rule[key] = true
+          rule[key] = key ~= "newline" or open ~= rule.close
         end
         assert(type(rule[key]) == "boolean", "pairs: rule." .. key .. " must be boolean")
       end
@@ -72,7 +72,7 @@ function M.build(opts)
   )
   assert(type(config.treesitter) == "boolean", "pairs: treesitter must be boolean")
   assert(type(config.mappings) == "table", "pairs: mappings must be a table")
-  for _, key in ipairs({ "enabled", "bs" }) do
+  for _, key in ipairs({ "enabled", "bs", "cr" }) do
     assert(type(config.mappings[key]) == "boolean", "pairs: mappings." .. key .. " must be boolean")
   end
   assert(type(config.disabled_filetypes) == "table", "pairs: disabled_filetypes must be a list")
