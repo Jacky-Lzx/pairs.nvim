@@ -1,5 +1,6 @@
 -- Tree-sitter describes insertion boundaries; the lexer still decides pairing.
 local M = {}
+local template_languages = { javascript = true, typescript = true, tsx = true }
 
 local function before(row, col, other_row, other_col)
   return row < other_row or (row == other_row and col < other_col)
@@ -11,6 +12,8 @@ local function string_node(kind)
     or kind == "template_string"
     or kind == "char_literal"
     or kind == "character_literal"
+    or kind == "regex"
+    or kind == "jsx_text"
 end
 
 local function line(buf, row)
@@ -48,6 +51,8 @@ local function string_context(buf, node)
     or node:type():find("raw", 1, true) ~= nil
     or node:type() == "template_string"
     or prefix:lower():find("f", 1, true) ~= nil
+  local last = node:child(node:child_count() - 1)
+  local template = node:type() == "template_string"
   return {
     syntax = "string",
     literal_string = literal,
@@ -65,6 +70,12 @@ local function string_context(buf, node)
         and not missing_end(node)
         and line(buf, er):sub(ec - 2, ec) == string.rep(quote, 3)
         and ec - 3
+      or nil,
+    template = template,
+    template_start_row = template and sr or nil,
+    template_open_col = template and sc or nil,
+    template_close_row = template and er or nil,
+    template_close_col = template and last and last:type() == "`" and not last:missing() and ec - 1
       or nil,
   }
 end
@@ -142,7 +153,14 @@ local function code_prefix(root, text, row, col, start)
 end
 
 function M.capture(buf, row, col, text)
-  local ok, parser = pcall(vim.treesitter.get_parser, buf)
+  -- React filetypes are not registered as aliases in a bare Neovim runtime.
+  -- Respect an explicit language registration before using standard aliases.
+  local ft = vim.bo[buf].filetype
+  local lang = vim.treesitter.language.get_lang(ft)
+  if lang == ft then
+    lang = ({ javascriptreact = "javascript", typescriptreact = "tsx" })[ft] or lang
+  end
+  local ok, parser = pcall(vim.treesitter.get_parser, buf, lang)
   if not ok or not parser then
     return {}
   end
@@ -159,7 +177,9 @@ function M.capture(buf, row, col, text)
   if not parser:is_valid(false, range) then
     return { syntax = "unknown" }
   end
-  local language = parser:language_for_range(range)
+  -- Tagged templates can inject HTML/SQL/etc. Those trees do not contain the
+  -- template's delimiters or substitutions; the outer JS/TS grammar owns them.
+  local language = template_languages[parser:lang()] and parser or parser:language_for_range(range)
   local tree = language:tree_for_range(range)
   if not tree then
     return { syntax = "unknown" }
@@ -168,6 +188,7 @@ function M.capture(buf, row, col, text)
   local node = root:named_descendant_for_range(row, left, row, left)
   local start = 0
   local previous_string
+  local substitution
   while node do
     local kind = node:type()
     local sr, sc, er, ec = node:range()
@@ -197,6 +218,15 @@ function M.capture(buf, row, col, text)
         local opener = node:child(0)
         local br, bc = opener:end_()
         start = br == row and bc or 0
+        if kind == "template_substitution" then
+          local closer = node:child(node:child_count() - 1)
+          substitution = {
+            body_row = br,
+            body_col = bc,
+            close_row = er,
+            close_col = closer and closer:type() == "}" and not closer:missing() and ec - 1 or nil,
+          }
+        end
         -- Python's conversion/format suffix is string text. Nested format
         -- expressions are visited first and remain code.
         for _, field in ipairs({ "format_specifier", "type_conversion" }) do
@@ -216,7 +246,13 @@ function M.capture(buf, row, col, text)
     node = node:parent()
   end
   local masked, reason = code_prefix(root, text, row, col, start)
-  return masked and { syntax = "code", lex_line = masked, previous_string = previous_string }
+  return masked
+      and {
+        syntax = "code",
+        lex_line = masked,
+        previous_string = previous_string,
+        substitution = substitution,
+      }
     or { syntax = "unknown", syntax_reason = reason }
 end
 

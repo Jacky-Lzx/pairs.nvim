@@ -83,6 +83,30 @@ configuration passed 29 acceptance cases with installed blink.cmp and LuaSnip
 plugins, plus startup smoke for default/minimal/Python profiles. LSP responses
 remain separate acceptance work.
 
+## JavaScript/TypeScript template milestone (implemented)
+
+- Opt-in single-character backticks and multi-character `${}` rules, independent
+  of each other and ordinary brace rules.
+- Parser-proven template and substitution boundaries for closing-key skip,
+  empty-pair deletion, and interpolation Enter expansion.
+- Tagged, multiline and nested templates; literal body text and escaped dollars
+  pass through. Existing interpolation closers are reused. Outer JS/TS trees
+  retain delimiter ownership when a tag injects another language.
+- String/comment/regex/JSX text contexts stay protected. React filetypes use
+  standard parser aliases while preserving explicit language registrations.
+- Native undo/redo and dot repeat, including multiline interpolation insertion.
+- Pinned TypeScript and TSX parser fixtures alongside Python/Rust/JavaScript.
+- Enable all four JS/TS/React filetype rules in the user's local configuration.
+
+Validation: 506 cumulative real-input cases with all five pinned grammar
+fixtures, including actual C language injection. Supported Neovim versions
+0.11.0 and 0.12.5 are checked before commit; 181 cases run without fixtures.
+The active configuration passed 65 input cases, including actual blink.cmp
+acceptance inside template expressions, LuaSnip placeholder navigation and
+multiline HTML tagged templates. Default/minimal/Python startup smoke passes.
+React completion keeps blink's existing kind-resolution policy; LSP semantic
+token responses remain separate acceptance work.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a

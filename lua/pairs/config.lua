@@ -59,16 +59,16 @@ local function validate_multi(rules)
   assert(type(rules) == "table", "pairs: multi_pairs must be a table")
   for open, rule in pairs(rules) do
     assert(
-      open == '"""' or open == "'''",
-      "pairs: multi_pairs currently supports triple quotes only"
+      open == '"""' or open == "'''" or open == "${",
+      "pairs: multi_pairs supports Python triple quotes and template interpolation only"
     )
     if rule ~= false then
       if type(rule) == "table" and rule.close == nil then
-        rule.close = open
+        rule.close = open == "${" and "}" or open
       end
       assert(
-        type(rule) == "table" and rule.close == open,
-        "pairs: triple quote closers must match the opener"
+        type(rule) == "table" and rule.close == (open == "${" and "}" or open),
+        "pairs: multi-character closer does not match its rule"
       )
       for _, key in ipairs({ "open", "skip", "delete", "newline" }) do
         if rule[key] == nil then

@@ -23,7 +23,7 @@ Options:
   treesitter           use installed parsers for syntax context, default false
   disabled_filetypes   list of disabled filetypes
   pairs                table keyed by opening delimiter; false disables a rule
-  multi_pairs          opt-in Python triple quotes, default {}
+  multi_pairs          opt-in triples and template interpolation, default {}
   filetypes            filetype -> { pairs, multi_pairs, enabled } overrides
 
 Rules contain close (single ASCII character), open, skip, delete, and newline
@@ -62,8 +62,47 @@ complete insertion.
 Multi rules contain open, skip, delete, and newline, all defaulting to true.
 The closer must equal the opener and may be omitted. false disables a rule.
 Precedence is global multi_pairs, filetype multi_pairs, b:pairs_multi_rules.
-Only Python triple quotes are supported. Missing/pending parser context cannot
+This rule family applies only to Python. Missing/pending parser context cannot
 trigger triple pairing; ordinary quote handling remains the fallback.
+
+JAVASCRIPT / TYPESCRIPT TEMPLATES                         *pairs-templates*
+
+Opt-in for javascript/javascriptreact/typescript/typescriptreact: >lua
+    local templates = {
+      pairs = { ['`'] = { close = '`' } },
+      multi_pairs = { ['${'] = {} },
+    }
+    require('pairs').setup({
+      treesitter = true,
+      filetypes = {
+        javascript = templates,
+        javascriptreact = templates,
+        typescript = templates,
+        typescriptreact = templates,
+      },
+    })
+<
+Install the relevant JavaScript/TypeScript/TSX parser. React filetype aliases
+are handled when no custom parser-language mapping is registered.
+
+Backticks pair, including after a tag, and skip the actual closing backtick
+on the same or another line. <BS> removes an adjacent empty template, keeping
+its tag. <CR> in template text remains an ordinary newline.
+The outer JS/TS grammar owns template boundaries even with language injections.
+
+In template text, { after an unescaped $ inserts {}. A following } is reused;
+opening before existing words is suppressed. Inside ${...}, normal code pairing
+applies. Nested templates, strings and object braces keep their own boundaries.
+The actual interpolation closer is skipped; ordinary template body characters,
+string/comment/regex/JSX text contexts remain protected.
+
+<BS> in an empty ${} removes all three characters; <CR> creates an indented
+middle and closing line. Backtick rules use standard open/skip/delete flags.
+multi_pairs['${'] defaults to close='}', with independent open/skip/delete/
+newline flags, all true. Overrides follow global/filetype/buffer precedence.
+Backtick, interpolation and ordinary brace rules work independently.
+Advanced template handling needs current parser context. Missing parsers use
+the line-local lexer; pending parses preserve original keys.
 
 ENTER                                                    *pairs-enter*
 

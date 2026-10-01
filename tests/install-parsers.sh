@@ -23,3 +23,16 @@ python v0.25.0
 rust 77a3747266f4d621d0757825e6b11edcbf991ca5
 javascript 58404d8cf191d69f2674a8fd507bd5776f46cb11
 PARSERS
+
+# TypeScript and TSX share a repository but have separate generated grammars.
+curl --fail --silent --show-error --location --retry 3 \
+  "https://codeload.github.com/tree-sitter/tree-sitter-typescript/tar.gz/v0.23.2" \
+  -o "$build_tmp/typescript.tar.gz"
+mkdir "$build_tmp/typescript"
+tar -xzf "$build_tmp/typescript.tar.gz" -C "$build_tmp/typescript" --strip-components=1
+for language in typescript tsx; do
+  "${CC:-cc}" "$link_flag" -fPIC -O2 -I "$build_tmp/typescript/$language/src" \
+    "$build_tmp/typescript/$language/src/parser.c" \
+    "$build_tmp/typescript/$language/src/scanner.c" \
+    -o "$fixture_root/parser/$language.so"
+done

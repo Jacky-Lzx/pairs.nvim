@@ -4,9 +4,9 @@ A small, conservative auto-pairs plugin for Neovim, with quote behavior as the
 first priority. Pure Lua; Neovim 0.11 or newer; no runtime dependencies.
 
 It handles Insert-mode quotes, brackets, matching-closer skipping, empty-pair
-backspace, and empty-bracket expansion on Enter. Python triple quotes are
-available as an opt-in rule. Other multi-character delimiters, wrapping, and
-command-line mode are planned.
+backspace, and empty-bracket expansion on Enter. Python triple quotes and
+JavaScript/TypeScript templates are available as opt-in rules. Other
+multi-character delimiters, wrapping, and command-line mode are planned.
 
 ## Local installation
 
@@ -163,10 +163,58 @@ the complete insertion.
 Multi-character rules have independent `open`, `skip`, `delete`, and `newline`
 flags, all defaulting to `true`; `false` disables a whole rule. Overrides use
 global `multi_pairs`, filetype `multi_pairs`, then `vim.b.pairs_multi_rules`.
-Only Python triple quotes are currently supported. The parser must confirm an
+This rule family applies only to Python. The parser must confirm an
 empty short string or a real closing triple delimiter; unavailable or pending
 syntax cannot trigger triple pairing. Ordinary quote behavior remains the
 fallback when syntax context is unavailable.
+
+## JavaScript and TypeScript templates
+
+Enable backticks and interpolation separately for the desired filetypes:
+
+```lua
+local templates = {
+  pairs = { ["`"] = { close = "`" } },
+  multi_pairs = { ["${"] = {} },
+}
+require("pairs").setup({
+  treesitter = true,
+  filetypes = {
+    javascript = templates,
+    javascriptreact = templates,
+    typescript = templates,
+    typescriptreact = templates,
+  },
+})
+```
+
+The rules are opt-in. Install the appropriate JavaScript, TypeScript or TSX
+parser for syntax-aware handling. React filetypes use JavaScript/TSX aliases
+when no custom parser-language mapping has been registered.
+
+- Backticks create an empty template, including after a tag such as `html` or
+  `factory()`. Typing a backtick at the real closing delimiter skips it, even
+  on another line. Backspace deletes an adjacent empty template, retaining its
+  tag. Template boundaries come from the outer JS/TS grammar even when a tag
+  injects HTML or another language. Enter inside a template remains an ordinary
+  newline.
+- In template text, typing `{` after an unescaped `$` produces `${│}`. An
+  existing following `}` is reused. Opening before existing words is suppressed.
+- Inside `${...}`, normal code pairing applies, including nested templates,
+  strings, parentheses and object braces. Only the real interpolation closing
+  `}` is skipped. Literal quotes and ordinary braces in template text pass
+  through; string/comment/regex/JSX text contexts remain protected.
+- Backspace in `${│}` deletes all three characters. Enter expands it into an
+  indented expression and closing line using the usual bracket indentation.
+
+Backtick rules use the standard single-character `open`, `skip` and `delete`
+flags. Interpolation rules use `multi_pairs["${"]`, with implicit `close = "}"`
+and independent `open`, `skip`, `delete` and `newline` flags, all defaulting to
+`true`. Global/filetype/buffer rule precedence is unchanged. Interpolation
+handling works independently of the backtick and ordinary brace rules.
+Advanced template handling requires current parser context; missing parsers
+use the line-local lexer, and pending parses preserve the original key.
+Rules follow the [ECMAScript template syntax](https://tc39.es/ecma262/multipage/ecmascript-language-lexical-grammar.html#sec-template-literal-lexical-components).
 
 ## Mappings and completion
 
@@ -241,7 +289,7 @@ for the `<Ignore>` pattern used by this plugin's mappings.
 ./tests/run.sh
 stylua --check lua tests plugin
 
-# Also exercise actual Python/Rust/JavaScript grammars:
+# Also exercise actual Python/Rust/JavaScript/TypeScript/TSX grammars:
 ./tests/install-parsers.sh /tmp/pairs-parsers
 PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers ./tests/run.sh
 ```
@@ -249,7 +297,8 @@ PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers ./tests/run.sh
 Tests use actual Neovim input and cursor positions in isolated XDG directories.
 They cover quotes, nesting, UTF-8 neighbors, backspace, Enter/indentation,
 undo/redo, dot repeat,
-configuration precedence, Python triple quotes and prefixes,
+configuration precedence, Python triple quotes and prefixes, JavaScript/TypeScript
+templates, tagged/nested templates and interpolation,
 Tree-sitter literal/interpolation boundaries and
 pending parses, completion/snippet-style buffer edits, macro/paste behavior,
 and mapping lifecycle. CI checks the minimum

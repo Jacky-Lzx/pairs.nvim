@@ -14,6 +14,10 @@ function M.decide(ctx, key)
   if not ctx.enabled then
     return decision("pass", ctx.disabled_reason or "disabled")
   end
+  local template = require("pairs.template").decide(ctx, key)
+  if template then
+    return template
+  end
   local multi = require("pairs.multichar").decide(ctx, key)
   if multi then
     return multi
