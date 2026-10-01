@@ -39,7 +39,7 @@ function M.expr(key)
       trace.fail(err)
     end
   end
-  return require("pairs.mapping").render(result)
+  return require("pairs.mapping").render(result, ctx)
 end
 
 -- Mapping API: returns Neovim keycodes, including the original key on fallback.

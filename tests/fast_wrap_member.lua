@@ -56,7 +56,7 @@ return function(h)
     "obj.\nvalue",
     "obj.value.",
     "obj.value..tail",
-    "obj.value()",
+    "obj.value()()",
     "obj.value[0]",
     "obj.value+tail",
     "obj.value:tail",

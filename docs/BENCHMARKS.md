@@ -58,8 +58,10 @@ not implicitly enabled for the ordinary baseline.
 Fast wrap checks adjacent-closer movement, missing-closer insertion and existing
 closer reuse in both bounded decisions and mapped cases, including text and
 undo/redo/dot checks. These three modes also exercise dotted member chains;
-a long chain checks bounded forward scanning. Its shortcut is enabled only in
-those mapped cases.
+a long chain checks bounded forward scanning. Complete-call cases add nested
+arguments, quotes, Unicode and a deeply nested target; mapped call cases check
+all three modes and native undo/redo/dot. Its shortcut is enabled only in those
+mapped cases.
 
 Neither metric measures physical keyboard-to-screen latency: these are headless
 runs without UI rendering, real completion/LSP responses or OS event delivery.

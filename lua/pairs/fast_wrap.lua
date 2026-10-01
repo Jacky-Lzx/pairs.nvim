@@ -35,6 +35,15 @@ function M.decide(ctx, state)
     end
     length = member_end
   end
+  local call = target:sub(length + 1, length + 1) == "("
+  if call then
+    local finish, reason =
+      require("pairs.wrap_call").finish(target, length + 1, ctx.lex, ctx.filetype)
+    if not finish then
+      return { action = "pass", reason = reason }
+    end
+    length = finish
+  end
   local last = ctx.col + offset + length
   if last > ctx.lex.max_scan_bytes then
     return { action = "pass", reason = "scan_limit" }
@@ -51,6 +60,9 @@ function M.decide(ctx, state)
     open = open,
     close = rule.close,
     move = length,
+    -- Calls may contain multibyte/composing characters. The adapter converts
+    -- this bounded text to native Right steps; move remains a byte length.
+    target = call and target:sub(1, length) or nil,
     remove_close = remove_close,
     insert_close = remove_close or after ~= rule.close,
   }

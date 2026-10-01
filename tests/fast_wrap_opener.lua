@@ -44,7 +44,7 @@ return function(h)
   end
   for _, before in ipairs({
     "(│value.",
-    "(│fn()",
+    "(│fn(",
     "(│items[0]",
     "(│value+tail",
     "(│café)",

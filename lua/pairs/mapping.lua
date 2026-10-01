@@ -95,10 +95,32 @@ function M.attach(config, handler, fast_wrap)
   table.sort(M.conflicts)
 end
 
-function M.render(result)
+local function wrap_moves(result, ctx)
+  if not result.target then
+    return result.move
+  end
+  local move = vim.fn.strchars(result.target, true)
+  local virtual = vim.o.virtualedit
+  if result.target:find("\t", 1, true) and (virtual:find("all") or virtual:find("insert")) then
+    -- Virtual editing lets Right stop inside a tab. Account for its display
+    -- cells using the post-deletion prefix and this buffer's tab settings.
+    local col = vim.fn.strdisplaywidth(ctx.line:sub(1, ctx.col))
+    for _, char in ipairs(vim.fn.split(result.target, "\\zs")) do
+      local width = vim.fn.strdisplaywidth(char, col)
+      if char == "\t" then
+        move = move + width - 1
+      end
+      col = col + width
+    end
+  end
+  return move
+end
+
+function M.render(result, ctx)
   if result.action == "wrap" then
+    local move = wrap_moves(result, ctx)
     return (result.remove_close and keycode("<Del>") or "")
-      .. string.rep(keycode("<C-g>U<Right>"), result.move)
+      .. string.rep(keycode("<C-g>U<Right>"), move)
       .. (result.insert_close and result.close or keycode("<C-g>U<Right>"))
   elseif result.action == "pair" then
     return result.open .. result.close .. string.rep(keycode("<C-g>U<Left>"), #result.close)

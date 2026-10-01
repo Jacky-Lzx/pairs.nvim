@@ -234,6 +234,41 @@ local cases = {
     action = "wrap",
   },
   {
+    name = "fast-wrap-call-adjacent",
+    line = "()obj.get(nested(x), y)",
+    col = 1,
+    key = "<FastWrap>",
+    action = "wrap",
+  },
+  {
+    name = "fast-wrap-call-missing",
+    line = "(obj.get(nested(x), y)",
+    col = 1,
+    key = "<FastWrap>",
+    action = "wrap",
+  },
+  {
+    name = "fast-wrap-call-reuse",
+    line = "(obj.get(nested(x), y))",
+    col = 1,
+    key = "<FastWrap>",
+    action = "wrap",
+  },
+  {
+    name = "fast-wrap-call-unicode",
+    line = '(obj.get("中文)", "é", [x]))',
+    col = 1,
+    key = "<FastWrap>",
+    action = "wrap",
+  },
+  {
+    name = "fast-wrap-call-deep",
+    line = "(fn(" .. string.rep("(", 1000) .. "x" .. string.rep(")", 1002),
+    col = 1,
+    key = "<FastWrap>",
+    action = "wrap",
+  },
+  {
     name = "padded-closer-skip",
     line = "( value )",
     col = 7,
@@ -535,6 +570,30 @@ mapped(
   { "(obj.value)x" },
   false,
   3,
+  { mappings = { fast_wrap = "<F8>" } }
+)
+mapped(
+  "mapped-call-adjacent",
+  '()fn("中文", x)' .. string.rep("<C-g>U<Left>", 12) .. "<F8>z",
+  { '(fn("中文", x))z' },
+  false,
+  7,
+  { mappings = { fast_wrap = "<F8>" } }
+)
+mapped(
+  "mapped-call-missing",
+  'fn("中文", x)' .. string.rep("<C-g>U<Left>", 11) .. "(<F8>z",
+  { '(fn("中文", x))z' },
+  false,
+  6,
+  { mappings = { fast_wrap = "<F8>" } }
+)
+mapped(
+  "mapped-call-reuse",
+  'fn("中文", x))' .. string.rep("<C-g>U<Left>", 12) .. "(<F8>z",
+  { '(fn("中文", x))z' },
+  false,
+  7,
   { mappings = { fast_wrap = "<F8>" } }
 )
 mapped(

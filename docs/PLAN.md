@@ -479,6 +479,45 @@ Stable/minimum-version benchmarks pass 30 decisions and 13 mapped cases;
 parser-free smoke passes 21 decisions and the same 13 mapped cases, including
 text and undo/redo/dot assertions. Formatting and diff checks pass.
 
+## Same-line complete call fast wrap milestone (implemented)
+
+- Extend each fast-wrap mode to an ASCII identifier/member chain with one
+  immediately adjoining (...) call. Prove balanced standard brackets and
+  ordinary single/double-quoted strings with escape parity inside the bounded
+  forward window. Preserve suffixes, immediate closer reuse, live policies and
+  existing identifier decision reasons/trace schema.
+- Keep one prefix lexer scan. Count the complete prefix, adjacent closer, callee,
+  arguments and call closer against max_scan_bytes, with one boundary byte.
+  Incomplete/mismatched calls and unsupported suffixes/literals remain untouched;
+  do not wrap a partial call, interpret general expressions or infer historical
+  ownership of a closer. Current text may complete an apparently missing call
+  closer, just as bracket reuse follows current nesting.
+- Reject argument comments, backticks, triple/long/raw/interpolated literals and
+  JS/TS/Ruby/Swift slash expressions conservatively. This is structural boundary
+  proof rather than a full language grammar; regex/division distinction and
+  chaining after calls remain outside support.
+- Retain pure native-key rendering, undo/redo/dot and reuse invariants. Convert
+  call text from byte lengths to native character steps, including composing
+  characters. Account for tab cells under virtualedit=all/insert with effective
+  tabstop/vartabstop and the post-deletion prefix. Pass the captured context to
+  the renderer; introduce no retained text, parser requests, mappings or options.
+  Trace move stays a byte length; internal target text is omitted from exported
+  decisions since the input snapshot already captures it.
+
+Validation: 1639 cumulative real-input tests pass on Neovim 0.11.0 and 0.12.5
+with pinned parser fixtures; 821 pass without fixtures. The 82 new cases cover
+all three pairs/modes, nested args, quotes/escapes, Unicode/composing characters,
+virtual tabs, disabled structural rules, malformed/complex targets, budget cuts,
+undo/redo/dot, pure reuse, fresh scans, trace replay and syntax/pending guards.
+The actual local configuration passes 317 input cases with real blink.cmp and
+LuaSnip, including call insertion/reuse inside active placeholders, subsequent
+navigation and Unicode arguments. All 172 tracked configuration files retain
+their original bytes; external LSP startup remains stubbed. Default/minimal/Python
+startup, executable README/help examples on both versions, help tags and health
+pass. Stable/minimum-version benchmarks pass 35 decisions and 16 mapped cases;
+parser-free smoke passes 26 decisions and the same 16 mapped cases, with text
+and undo/redo/dot assertions. Formatting and diff checks pass.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a

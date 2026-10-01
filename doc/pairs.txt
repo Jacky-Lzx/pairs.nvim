@@ -332,8 +332,11 @@ before the owner's native fallback. See the blink.cmp example in README.md.
 
 FAST WRAP                                                *pairs-fast-wrap*
 
-Wraps the next same-line identifier or dotted member chain after a standard
-opening bracket:
+Wraps the next same-line identifier, dotted member chain or complete function
+call after a standard opening bracket:
+  (|fn(a, b)     -> (fn(a, b))|
+  (|obj.get())   -> (obj.get())|
+  (|)fn(g(x))    -> (fn(g(x)))|
   (|obj.value    -> (obj.value)|
   (|obj.value)   -> (obj.value)|
   (|)obj.value   -> (obj.value)|
@@ -363,12 +366,18 @@ The existing normal opening policy is unchanged. The cursor must immediately
 follow (, [ or {, with the target after the cursor or an adjacent closer.
 Each identifier matches [A-Za-z_][A-Za-z0-9_]*. Member chains join these with
 single dots and no whitespace, e.g. self.name or config.options.enabled.
-Incomplete members, repeated dots, Unicode identifiers, leading whitespace,
-padded pairs, quotes, calls, indexing and immediately adjoining operators do not
-wrap. Unsupported chains such as obj.value(), obj.value[0], obj?.value and obj.
-stay untouched. End of line, whitespace, commas, semicolons and standard closing
-brackets terminate a target. Following text stays unchanged; the whole chain
-wraps.
+A callee may have one immediately adjoining, complete (...) call. Arguments
+may contain nested (), [] and {}, ordinary single/double-quoted strings and
+backslash escapes. Unicode/tabs in arguments stay unchanged; callees remain
+ASCII. This proves bracket/quote boundaries, not language-level validity.
+Incomplete/mismatched calls, incomplete members, repeated dots, Unicode callees,
+leading whitespace, padded pairs, indexing and adjoining operators do not wrap.
+Chaining after calls (fn()(), fn().value, fn()[0]) and obj?.value stay untouched.
+Comments, backticks, triple/long/raw/interpolated literals inside arguments are
+conservatively rejected. JS/TS/Ruby/Swift slash expressions, including division, stay
+untouched because a slash may start a regex. End of line, whitespace, commas,
+semicolons and standard closers terminate a target; suffix text stays unchanged.
+The whole contiguous chain/call wraps.
 A matching closer must immediately follow the target to be reused. Spaces and
 other suffix text are preserved. Reuse follows current bracket nesting; other
 unclosed outer brackets are not repaired.
@@ -377,15 +386,18 @@ wrap defaults to true for standard brackets, false for other rules. Disable it
 globally/per-filetype/in b:pairs_rules. It is independent of open/skip/delete/
 space/skip_space. Strings/comments, unsafe/pending syntax, escaped/unmatched
 prefixes and structural interpolation delimiters do not wrap. Prefix and target
-share max_scan_bytes, with one byte of boundary lookahead. Missing parsers use
-the existing line-local lexer fallback.
+including call arguments/closer share max_scan_bytes, with one boundary byte.
+Missing parsers use the existing line-local lexer fallback.
 Changing a standard closer to a custom one disables inherited wrapping, keeping
 existing custom rules valid. Explicit wrap=true requires a standard pair.
 
 Native movement and any required deletion/insertion retain undo/redo/dot. Dot replays the
 recorded movement length, without choosing a new target. Inspect with
 :PairsInspect <FastWrap>. Traces record logical key <FastWrap>, wrap policy and
-target length, remove_close and insert_close flags (including false values).
+target byte length, remove_close and insert_close flags (including false values).
+The adapter converts call text to native movement steps, accounting for composing
+characters and virtual editing inside tabs. Trace move remains a byte length;
+internal target text is omitted since the input snapshot already captures it.
 Reproduce exports via fast_wrap() or expr('<FastWrap>');
 <FastWrap> is an API action name, not a physical key.
 

@@ -35,7 +35,7 @@ return function(h)
     { "Unicode target", "(│)中文" },
     { "Unicode identifier suffix", "(│)café" },
     { "incomplete member access", "(│)obj." },
-    { "function call", "(│)fn()" },
+    { "incomplete function call", "(│)fn(" },
     { "indexing", "(│)items[0]" },
     { "operator without a boundary", "(│)value+other" },
     { "quoted target", '(│)"value"' },
