@@ -20,6 +20,7 @@ Options:
   mappings.bs          install <BS> mapping, default true
   mappings.cr          install <CR> mapping, default true
   mappings.space       allow opt-in Space mapping, default true
+  mappings.fast_wrap   optional single non-text shortcut, default false
   max_scan_bytes       maximum line prefix to scan, default 4096
   treesitter           use installed parsers for syntax context, default false
   disabled_filetypes   list of disabled filetypes
@@ -30,7 +31,7 @@ Options:
 
 Rules contain close (single ASCII character), open, skip, delete, and newline
 (booleans), plus space and skip_space (booleans, default false;
-(), [] and {} only).
+(), [] and {} only), and wrap (true for (), [] and {}; false otherwise).
 Open/skip/delete default to true for new rules. Newline defaults
 to true for asymmetric pairs; symmetric quotes never expand. Overrides merge
 with defaults.
@@ -329,6 +330,51 @@ Existing Enter mappings are preserved. For a completion-owned Enter, set
 mappings.cr=false and compose expr('<CR>') after completion confirmation and
 before the owner's native fallback. See the blink.cmp example in README.md.
 
+FAST WRAP                                                *pairs-fast-wrap*
+
+Moves an adjacent empty bracket's closer around the next same-line identifier:
+  (|)value       -> (value)|
+  [|]item_2      -> [item_2]|
+  fn((|)value, x) -> fn((value)|, x)
+
+The shortcut is unmapped by default. Opt in with:
+>lua
+    require('pairs').setup({ mappings = { fast_wrap = '<M-e>' } })
+<
+Use a recognized single non-text key such as <M-e> or <F8>. Text keys,
+BS/CR/Tab/Escape and command pseudo-keys are rejected before setup. Existing
+global/buffer mappings are preserved; conflicts are reported. The owned
+shortcut flushes queued text and is a no-op when wrapping is unavailable.
+mappings.enabled=false prevents its installation.
+
+fast_wrap() returns native keycodes or nil for caller fallback; it does not
+edit the buffer when called. Compose it in an expression mapping using
+replace_keycodes=false. Account for queued text with the <Ignore>/private
+expression pattern described in |map-expression|.
+
+The cursor must be inside adjacent empty (), [] or {}, with the target directly
+after its closer. Typing only ( before existing text keeps the existing opening
+policy; it does not create this precondition. Targets match ASCII identifiers
+[A-Za-z_][A-Za-z0-9_]*. Unicode identifiers, leading whitespace, padded pairs,
+quotes, calls/member access/indexing and immediately adjoining operators do not
+wrap. End of line, whitespace, commas, semicolons and standard closing brackets
+terminate a target. Following text stays unchanged; only one identifier wraps.
+
+wrap defaults to true for standard brackets, false for other rules. Disable it
+globally/per-filetype/in b:pairs_rules. It is independent of open/skip/delete/
+space/skip_space. Strings/comments, unsafe/pending syntax, escaped/unmatched
+prefixes and structural interpolation delimiters do not wrap. Prefix and target
+share max_scan_bytes, with one byte of boundary lookahead. Missing parsers use
+the existing line-local lexer fallback.
+Changing a standard closer to a custom one disables inherited wrapping, keeping
+existing custom rules valid. Explicit wrap=true requires a standard pair.
+
+Native deletion/movement/insertion retains undo/redo/dot. Dot replays the
+recorded movement length, without choosing a new identifier. Inspect with
+:PairsInspect <FastWrap>. Traces record logical key <FastWrap>, wrap policy and
+target length. Reproduce exports via fast_wrap() or expr('<FastWrap>');
+<FastWrap> is an API action name, not a physical key.
+
 SPACE PADDING                                            *pairs-space*
 
 Padding is disabled by default. Enable it per standard bracket rule: >lua
@@ -394,6 +440,7 @@ API                                                      *pairs-api*
 setup(opts)            Validate config and install non-conflicting mappings.
 expr(key)              Return handled keycodes, or nil for caller fallback.
 handle(key)            Return handled or original keycodes.
+fast_wrap()            Return wrap keycodes, or nil for caller fallback.
 explain(key, opts)     Return action/reason without editing; Insert mode by
                       default. opts.assume_insert previews insertion before
                       the Normal-mode cursor.
@@ -405,6 +452,8 @@ teardown()            Remove only mappings still owned by this plugin.
 
 Use key notation such as '<BS>' or '<CR>'. expr()/handle() return termcodes; mappings
 should use { expr = true, replace_keycodes = false }.
+Logical action '<FastWrap>' also works with expr()/explain(); handle() returns
+an empty string for that action on fallback. See |pairs-fast-wrap|.
 Plugin-owned mappings use <Ignore> before a private expression mapping to flush
 preceding typed text. Composed mappings should consider |map-expression| order.
 
@@ -512,7 +561,8 @@ Existing global mappings are preserved; buffer mappings take precedence.
 Paste, macro recording/replay, Replace mode, and special buffers bypass pairing.
 Runtime context errors pass through and are exposed by explain().
 
-Other multi-character pairs, wrapping and command-line mode are planned.
+Other multi-character pairs, general expression/selection wrapping and
+command-line mode are planned.
 See README.md and docs/PLAN.md in the checkout for details.
 
  vim:tw=78:ts=8:ft=help:norl:

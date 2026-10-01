@@ -49,6 +49,7 @@ local function rules_copy(rules, single)
       if single then
         copy[open].space = rule.space
         copy[open].skip_space = rule.skip_space
+        copy[open].wrap = rule.wrap
       end
     end
   end

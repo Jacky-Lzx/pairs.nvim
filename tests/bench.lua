@@ -190,6 +190,7 @@ local cases = {
   { name = "quote-open", key = '"', action = "pair" },
   { name = "bracket-open", key = "(", action = "pair" },
   { name = "closer-skip", line = "()", col = 1, key = ")", action = "skip" },
+  { name = "fast-wrap-identifier", line = "()value", col = 1, key = "<FastWrap>", action = "wrap" },
   {
     name = "padded-closer-skip",
     line = "( value )",
@@ -446,6 +447,14 @@ mapped("native-balanced-batch", stream, { stream }, true, 0)
 mapped("mapped-balanced-batch", stream, { stream }, false, 300)
 mapped("mapped-backspace-batch", string.rep('(<BS>[<BS>{<BS>"<BS>', 50) .. "z", { "z" }, false, 400)
 mapped("mapped-enter", "{<CR>x", { "{", "  x", "}" }, false, 2)
+mapped(
+  "mapped-fast-wrap",
+  "()value" .. string.rep("<C-g>U<Left>", 6) .. "<F8>x",
+  { "(value)x" },
+  false,
+  3,
+  { mappings = { fast_wrap = "<F8>" } }
+)
 mapped(
   "mapped-padding-batch",
   string.rep("( <BS><BS>", 50) .. "z",

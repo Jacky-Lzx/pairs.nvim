@@ -27,7 +27,7 @@ end
 
 M.defaults = {
   enabled = true,
-  mappings = { enabled = true, bs = true, cr = true, space = true },
+  mappings = { enabled = true, bs = true, cr = true, space = true, fast_wrap = false },
   max_scan_bytes = 4096,
   treesitter = false,
   disabled_filetypes = { "TelescopePrompt", "snacks_picker_input" },
@@ -64,11 +64,15 @@ local function validate_pairs(rules)
           and rule.close:byte() < 127,
         "pairs: closing delimiters must be single printable ASCII characters"
       )
-      for _, key in ipairs({ "open", "skip", "delete", "newline", "space", "skip_space" }) do
+      for _, key in ipairs({ "open", "skip", "delete", "newline", "space", "skip_space", "wrap" }) do
         if rule[key] == nil then
-          rule[key] = key ~= "space"
-            and key ~= "skip_space"
-            and (key ~= "newline" or open ~= rule.close)
+          if key == "wrap" then
+            rule[key] = ({ ["("] = ")", ["["] = "]", ["{"] = "}" })[open] == rule.close
+          else
+            rule[key] = key ~= "space"
+              and key ~= "skip_space"
+              and (key ~= "newline" or open ~= rule.close)
+          end
         end
         assert(type(rule[key]) == "boolean", "pairs: rule." .. key .. " must be boolean")
       end
@@ -79,6 +83,10 @@ local function validate_pairs(rules)
       assert(
         not rule.skip_space or ({ ["("] = ")", ["["] = "]", ["{"] = "}" })[open] == rule.close,
         "pairs: skip_space supports (), [] and {} only"
+      )
+      assert(
+        not rule.wrap or ({ ["("] = ")", ["["] = "]", ["{"] = "}" })[open] == rule.close,
+        "pairs: wrap supports (), [] and {} only"
       )
       assert(not closers[rule.close], "pairs: closing delimiters must be unique")
       closers[rule.close] = open
@@ -129,6 +137,16 @@ end
 local function merge_rules(base, overrides)
   local rules = vim.tbl_deep_extend("force", vim.deepcopy(base), overrides or {})
   for open, rule in pairs(overrides or {}) do
+    -- Changing a standard closer must not make legacy custom rules inherit a
+    -- newly introduced capability they cannot support. Explicit flags validate.
+    if
+      type(rule) == "table"
+      and rule.close
+      and rule.wrap == nil
+      and ({ ["("] = ")", ["["] = "]", ["{"] = "}" })[open] ~= rule.close
+    then
+      rules[open].wrap = false
+    end
     -- A partial policy cannot recreate a delimiter disabled by a previous
     -- layer. Re-enabling it requires an explicit complete rule with a closer.
     if base[open] == false and type(rule) == "table" and rule.close == nil then
@@ -158,6 +176,32 @@ function M.build(opts)
   assert(type(config.mappings) == "table", "pairs: mappings must be a table")
   for _, key in ipairs({ "enabled", "bs", "cr", "space" }) do
     assert(type(config.mappings[key]) == "boolean", "pairs: mappings." .. key .. " must be boolean")
+  end
+  local wrap_key = config.mappings.fast_wrap
+  assert(
+    wrap_key == false or (type(wrap_key) == "string" and wrap_key:match("^<[^<>]+>$")),
+    "pairs: mappings.fast_wrap must be false or a single non-text key such as <M-e>"
+  )
+  if wrap_key then
+    local code = vim.api.nvim_replace_termcodes(wrap_key, true, true, true)
+    local canonical = vim.fn.keytrans(code)
+    assert(
+      code ~= wrap_key
+        and canonical:match("^<[^<>]+>$")
+        and not vim.tbl_contains({
+          "<BS>",
+          "<C-H>",
+          "<CR>",
+          "<Tab>",
+          "<Esc>",
+          "<Ignore>",
+          "<Plug>",
+          "<Nop>",
+          "<Cmd>",
+          "<ScriptCmd>",
+        }, canonical),
+      "pairs: fast_wrap key must be recognized and cannot replace text, BS, CR, Tab or Esc"
+    )
   end
   assert(type(config.disabled_filetypes) == "table", "pairs: disabled_filetypes must be a list")
   for _, ft in ipairs(config.disabled_filetypes) do

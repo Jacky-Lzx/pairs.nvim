@@ -55,6 +55,9 @@ The current benchmark also checks opt-in empty-space, padded Backspace/Enter
 and cross-space closer decisions, plus mapped padding/deletion/Enter/closer
 batches. Other scenarios keep their default rules; padding and skip_space are
 not implicitly enabled for the ordinary baseline.
+Fast wrap adds one bounded identifier decision and one mapped identifier-wrap
+case, including text, undo/redo/dot checks. Its shortcut is enabled only in that
+mapped case.
 
 Neither metric measures physical keyboard-to-screen latency: these are headless
 runs without UI rendering, real completion/LSP responses or OS event delivery.

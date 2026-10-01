@@ -4,10 +4,11 @@ A small, conservative auto-pairs plugin for Neovim, with quote behavior as the
 first priority. Pure Lua; Neovim 0.11 or newer; no runtime dependencies.
 
 It handles Insert-mode quotes, brackets, matching-closer skipping, empty-pair
-backspace, and empty-bracket expansion on Enter. Python triple quotes,
+backspace, empty-bracket expansion on Enter, and explicit same-line identifier
+wrapping. Python triple quotes,
 JavaScript/TypeScript templates, Markdown fences and LaTeX math delimiters are
-available as opt-in rules. Other multi-character delimiters, wrapping, and command-line mode are
-planned.
+available as opt-in rules. Other multi-character delimiters, general expression/
+selection wrapping, and command-line mode are planned.
 
 ## Local installation
 
@@ -538,6 +539,7 @@ end, { expr = true, replace_keycodes = false })
 
 - `expr(key)` returns Neovim keycodes when handled, or `nil` for fallback.
 - `handle(key)` returns the handled keycodes or the original keycodes.
+- `fast_wrap()` returns keycodes to wrap the next identifier, or `nil` for fallback.
 - `explain(key)` returns the action and reason without changing text. Call it
   in Insert mode to inspect the actual insertion cursor. `:PairsInspect {key}`
   previews insertion **before** the Normal-mode cursor.
@@ -554,6 +556,62 @@ When composing your own mappings, account for Neovim's expression evaluation
 order: preceding text may still be queued. See the
 [expression mapping documentation](https://neovim.io/doc/user/map.html#map-expression)
 for the `<Ignore>` pattern used by this plugin's mappings.
+
+## Fast wrap
+
+Fast wrap moves the closer of an adjacent empty `()`, `[]` or `{}` around the
+next same-line ASCII identifier. It leaves the cursor after the moved closer:
+
+| Before | Action | After |
+| --- | --- | --- |
+| `(│)value` | fast wrap | `(value)│` |
+| `[│]item_2` | fast wrap | `[item_2]│` |
+| `fn((│)value, next)` | fast wrap | `fn((value)│, next)` |
+
+No shortcut is installed by default. To enable an optional Insert-mode shortcut:
+
+```lua
+require("pairs").setup({ mappings = { fast_wrap = "<M-e>" } })
+```
+
+Use a recognized single non-text key such as `<M-e>` or `<F8>`. Text keys,
+Backspace/Enter/Tab/Escape and command pseudo-keys are rejected before setup.
+Existing global/buffer shortcut owners are preserved and conflicts are reported.
+The owned shortcut flushes queued input before deciding and does nothing when
+wrapping is unavailable. `mappings.enabled = false` prevents its installation.
+
+`fast_wrap()` is an expression API returning native keycodes or `nil`; it does
+not edit the buffer when called. Custom owners can compose it before their own
+fallback. Returned keycodes require `replace_keycodes = false`. Account for
+queued typed text using the same `<Ignore>`/private expression mapping pattern
+as the plugin's owned shortcut.
+
+The cursor must be between adjacent empty brackets, with the identifier directly
+after the closer. Typing only `(` before an existing word retains the existing
+opening policy and does not create that precondition. Identifiers match
+`[A-Za-z_][A-Za-z0-9_]*`; Unicode identifiers, leading whitespace, padding,
+quotes, calls, member access, indexing and immediately adjoining operators are
+outside this version's target support. End of line, whitespace, commas,
+semicolons and standard closing brackets terminate a target; any following text
+is preserved. Only the first identifier is wrapped, never a full expression.
+
+The single-character `wrap` flag defaults to true for standard brackets and
+false for other rules. Disable it per rule, filetype or live `b:pairs_rules`.
+It is independent of `open`, `skip`, `delete`, `space` and `skip_space`.
+Changing a standard closer to a custom one disables inherited wrapping;
+existing custom rules remain valid. Explicit `wrap = true` requires a standard pair.
+Strings/comments, unsafe/pending syntax, escaped/unmatched prefixes and
+structural interpolation delimiters do not wrap. The complete same-line prefix
+and identifier share `max_scan_bytes`, with one boundary-lookahead byte.
+Missing parsers retain the existing line-local lexer fallback.
+
+Native deletion/movement/insertion preserves undo/redo and dot repeat; dot
+replays the recorded movement length rather than selecting a new target.
+`:PairsInspect <FastWrap>` previews the decision without editing. Actual calls
+are traced with the logical key `<FastWrap>`, the `wrap` policy and target length.
+Reproduce an exported wrap through `fast_wrap()` or `expr("<FastWrap>")`;
+`<FastWrap>` is an API action name, not a physical key. `handle("<FastWrap>")`
+returns an empty string on fallback.
 
 ## Empty-bracket space padding
 

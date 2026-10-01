@@ -48,6 +48,9 @@ function M.decide(ctx, key)
   if state.comment or ctx.syntax == "comment" then
     return decision("pass", "comment")
   end
+  if key == "<FastWrap>" then
+    return require("pairs.fast_wrap").decide(ctx, state)
+  end
   if ctx.has_space and (key == " " or empty_key) then
     local padding = require("pairs.padding").decide(ctx, key, state)
     if padding then

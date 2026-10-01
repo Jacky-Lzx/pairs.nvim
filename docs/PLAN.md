@@ -381,6 +381,41 @@ parser-free smoke passes 14 decisions and the same seven mapped scenarios.
 Default/minimal/Python startup, executable README/help examples on both versions,
 help tags, health, formatting and diff checks also pass.
 
+## Same-line identifier fast wrap milestone (implemented)
+
+- Add fast_wrap() as a composable expression API, plus logical <FastWrap> for
+  expr/explain/inspection/trace. No physical shortcut is installed by default;
+  mappings.fast_wrap can opt into a validated single non-text key. Preserve
+  existing global/buffer owners, queued-input flushing and teardown ownership.
+- Move an adjacent empty standard bracket's closer around one immediately
+  following ASCII identifier. Preserve suffix text and leave the cursor after
+  the closer using native Del, protected Right movements and insertion.
+  Retain undo/redo/dot; dot replays the recorded movement length.
+- Keep calls/member access/indexing, Unicode identifiers, padding, intervening
+  whitespace, strings/comments, unsafe/pending syntax and structural
+  interpolation boundaries outside target support. Share the existing bounded
+  prefix scan and max_scan_bytes budget with the forward identifier, plus one
+  boundary-lookahead byte. No extra parser request, text cache or buffer edit.
+- Add independent wrap policies for standard brackets and validated live
+  overrides. Legacy custom closer overrides disable inherited wrapping instead
+  of invalidating existing configuration. Trace exports retain policy/target
+  length and support confirmed local API replay.
+
+Validation: 1451 cumulative real-input tests pass on Neovim 0.11.0 and 0.12.5
+with pinned parser fixtures; 661 pass without fixtures. The 52 added cases cover
+standard shapes, suffix/cursor positions, conservative token boundaries, native
+undo/redo/dot, API fallback, single-scan/forward limits, legacy policy overrides,
+shortcut validation/ownership/composition, export replay and parser protection.
+The actual local configuration passes 265 input cases with real blink.cmp and
+LuaSnip, including fast wrap in an active snippet placeholder, subsequent
+navigation and nested undo/redo/dot. Options are changed only in the acceptance
+process and then restored; all 172 tracked configuration files retain their
+original bytes. External LSP startup remains stubbed.
+Stable/minimum-version benchmark smoke passes 24 decisions and eight mapped
+cases; parser-free smoke passes 15 decisions and the same eight mapped cases.
+Default/minimal/Python startup, executable README/help examples on both versions,
+help tags, health, formatting and diff checks pass.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a

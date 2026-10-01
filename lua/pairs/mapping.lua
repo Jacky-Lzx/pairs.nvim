@@ -26,7 +26,7 @@ function M.detach()
   M.owned, M.conflicts = {}, {}
 end
 
-function M.attach(config, handler)
+function M.attach(config, handler, fast_wrap)
   if not config.mappings.enabled then
     return
   end
@@ -63,6 +63,9 @@ function M.attach(config, handler)
   if config.mappings.cr then
     keys["<CR>"] = true
   end
+  if config.mappings.fast_wrap then
+    keys[config.mappings.fast_wrap] = true
+  end
   for _, key in ipairs(vim.tbl_keys(keys)) do
     local lhs = key == " " and "<Space>" or key
     local bytes = { lhs:byte(1, #lhs) }
@@ -71,6 +74,9 @@ function M.attach(config, handler)
       M.conflicts[#M.conflicts + 1] = lhs
     else
       local callback = function()
+        if key == config.mappings.fast_wrap then
+          return fast_wrap() or ""
+        end
         return handler(key)
       end
       vim.keymap.set("i", plug, callback, {
@@ -90,7 +96,9 @@ function M.attach(config, handler)
 end
 
 function M.render(result)
-  if result.action == "pair" then
+  if result.action == "wrap" then
+    return keycode("<Del>") .. string.rep(keycode("<C-g>U<Right>"), result.move) .. result.close
+  elseif result.action == "pair" then
     return result.open .. result.close .. string.rep(keycode("<C-g>U<Left>"), #result.close)
   elseif result.action == "skip" then
     return string.rep(keycode("<C-g>U<Right>"), result.move or #result.close)

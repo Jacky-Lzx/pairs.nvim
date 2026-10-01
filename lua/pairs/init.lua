@@ -9,7 +9,7 @@ function M.setup(opts)
   local mapping = require("pairs.mapping")
   mapping.detach()
   config, enabled = candidate, true
-  mapping.attach(config, M.handle)
+  mapping.attach(config, M.handle, M.fast_wrap)
 end
 
 local function decide(key, opts)
@@ -44,7 +44,12 @@ end
 
 -- Mapping API: returns Neovim keycodes, including the original key on fallback.
 function M.handle(key)
-  return M.expr(key) or require("pairs.mapping").keycode(key)
+  return M.expr(key) or (key == "<FastWrap>" and "" or require("pairs.mapping").keycode(key))
+end
+
+-- Expression API: explicit invocation, with nil for the caller's fallback.
+function M.fast_wrap()
+  return M.expr("<FastWrap>")
 end
 
 function M.enable(buf)
