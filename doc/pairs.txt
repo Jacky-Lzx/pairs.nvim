@@ -23,17 +23,47 @@ Options:
   treesitter           use installed parsers for syntax context, default false
   disabled_filetypes   list of disabled filetypes
   pairs                table keyed by opening delimiter; false disables a rule
-  filetypes            filetype -> { pairs = overrides, enabled = boolean }
+  multi_pairs          opt-in Python triple quotes, default {}
+  filetypes            filetype -> { pairs, multi_pairs, enabled } overrides
 
 Rules contain close (single ASCII character), open, skip, delete, and newline
 (booleans). Open/skip/delete default to true for new rules. Newline defaults
 to true for asymmetric pairs; symmetric quotes never expand. Overrides merge
 with defaults.
-Closing delimiters must be unique. Multi-character delimiters are unsupported.
+Closing delimiters must be unique. Multi-character rules use multi_pairs.
 Single-quote opening defaults to false in text, markdown, and rust.
+Re-enabling a single-character rule disabled with false requires its close value.
 
 Buffer overrides use b:pairs_enabled and b:pairs_rules. Buffer rules override
 global and filetype rules; newly introduced delimiters need explicit mappings.
+
+PYTHON TRIPLE QUOTES                                      *pairs-triples*
+
+Opt-in, with treesitter=true and an installed Python parser: >lua
+    require('pairs').setup({
+      treesitter = true,
+      filetypes = {
+        python = {
+          multi_pairs = {
+            [string.rep('"', 3)] = {},
+            [string.rep("'", 3)] = {},
+          },
+        },
+      },
+    })
+<
+Typing the third identical quote after a complete empty short string creates
+a triple pair. Python r/u/b/f/br/rb/fr/rf prefixes are supported in either case.
+At its real closing delimiter each quote press skips one quote. Body quotes
+pass through. <BS> removes an adjacent empty triple pair; <CR> creates a middle
+and closing line aligned with the opening line. Undo/redo and dot retain the
+complete insertion.
+
+Multi rules contain open, skip, delete, and newline, all defaulting to true.
+The closer must equal the opener and may be omitted. false disables a rule.
+Precedence is global multi_pairs, filetype multi_pairs, b:pairs_multi_rules.
+Only Python triple quotes are supported. Missing/pending parser context cannot
+trigger triple pairing; ordinary quote handling remains the fallback.
 
 ENTER                                                    *pairs-enter*
 
@@ -64,6 +94,8 @@ teardown()            Remove only mappings still owned by this plugin.
 
 Use key notation such as '<BS>' or '<CR>'. expr()/handle() return termcodes; mappings
 should use { expr = true, replace_keycodes = false }.
+Plugin-owned mappings use <Ignore> before a private expression mapping to flush
+preceding typed text. Composed mappings should consider |map-expression| order.
 
 COMMANDS                                                 *pairs-commands*
 
@@ -94,6 +126,7 @@ Existing global mappings are preserved; buffer mappings take precedence.
 Paste, macro recording/replay, Replace mode, and special buffers bypass pairing.
 Runtime context errors pass through and are exposed by explain().
 
-Multi-character pairs, wrapping and command-line mode are planned. See README.md and docs/PLAN.md in the checkout for details.
+Other multi-character pairs, wrapping and command-line mode are planned.
+See README.md and docs/PLAN.md in the checkout for details.
 
  vim:tw=78:ts=8:ft=help:norl:

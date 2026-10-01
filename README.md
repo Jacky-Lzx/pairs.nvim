@@ -4,8 +4,9 @@ A small, conservative auto-pairs plugin for Neovim, with quote behavior as the
 first priority. Pure Lua; Neovim 0.11 or newer; no runtime dependencies.
 
 It handles Insert-mode quotes, brackets, matching-closer skipping, empty-pair
-backspace, and empty-bracket expansion on Enter. Multi-character delimiters,
-wrapping, and command-line mode are planned.
+backspace, and empty-bracket expansion on Enter. Python triple quotes are
+available as an opt-in rule. Other multi-character delimiters, wrapping, and
+command-line mode are planned.
 
 ## Local installation
 
@@ -88,8 +89,10 @@ require("pairs").setup({
 Defaults are `()`, `[]`, `{}`, `""`, and `''`. Rules are merged in the order
 global defaults → global configuration → filetype → buffer. Delimiters must be
 single printable ASCII characters; closing delimiters must be unambiguous.
-Multi-character rules such as triple quotes, code fences, and `$$` are not
-supported yet. Do not enable `<>` globally unless you want it to pair operators.
+Multi-character rules use the separate `multi_pairs` option described below.
+Code fences and `$$` are not supported yet. Do not enable `<>` globally unless
+you want it to pair operators. To re-enable an entire single-character rule
+disabled with `false`, provide its `close` value along with the override.
 
 Per-buffer overrides:
 
@@ -122,12 +125,58 @@ fully understand multiline strings, block comments, interpolation, injected
 languages, or all language-specific literal forms. Scans exceeding the byte
 limit and malformed bracket prefixes pass the original key through.
 
+## Python triple quotes
+
+Triple quotes are disabled by default. Enable them for Python with an installed
+Python Tree-sitter parser:
+
+```lua
+require("pairs").setup({
+  treesitter = true,
+  filetypes = {
+    python = {
+      multi_pairs = {
+        [string.rep('"', 3)] = {},
+        [string.rep("'", 3)] = {},
+      },
+    },
+  },
+})
+```
+
+Typing three identical quotes upgrades the preceding empty string into a
+triple-quoted pair. Both quote styles and Python prefixes `r`, `u`, `b`, `f`,
+`br`, `rb`, `fr`, and `rf` are supported, including uppercase variants.
+
+| Before | Input | After |
+| --- | --- | --- |
+| `""│` | `"` | `"""│"""` |
+| `"""body│"""` | `"` | `"""body"│""` |
+| `"""│"""` | `<BS>` | `│` |
+
+Three closing-key presses move across a closing triple delimiter one quote at a
+time. Quotes inside the body pass through. Enter in an adjacent empty triple
+creates a middle and closing line at the opening line's indentation, keeping
+docstring content aligned with its delimiter. Undo/redo and dot repeat retain
+the complete insertion.
+
+Multi-character rules have independent `open`, `skip`, `delete`, and `newline`
+flags, all defaulting to `true`; `false` disables a whole rule. Overrides use
+global `multi_pairs`, filetype `multi_pairs`, then `vim.b.pairs_multi_rules`.
+Only Python triple quotes are currently supported. The parser must confirm an
+empty short string or a real closing triple delimiter; unavailable or pending
+syntax cannot trigger triple pairing. Ordinary quote behavior remains the
+fallback when syntax context is unavailable.
+
 ## Mappings and completion
 
 Setup preserves existing global mappings and leaves buffer mappings alone.
 `require("pairs").status().conflicts` reports skipped keys. Disable the previous
 pairs plugin instead of running two mapping owners together. Setup is
 idempotent; teardown removes only mappings still owned by this plugin.
+Plugin-owned keys flush preceding typed text before evaluating their expression
+through a private `<Plug>` mapping. This keeps fast continuous input and string
+prefixes consistent with the actual insertion context.
 
 `<CR>` expands adjacent empty `()`, `[]`, and `{}` into three lines, leaving the
 cursor on the indented middle line. Quotes, strings, comments, nonempty pairs,
@@ -181,6 +230,10 @@ used with `replace_keycodes = false` to avoid a second conversion. Insert
 movement uses `<C-g>U` so generating/skipping a closer stays in the same undo
 block and ordinary insertions remain dot-repeatable. Paste, macro recording
 and replay, Replace mode, and special buffers bypass pairing.
+When composing your own mappings, account for Neovim's expression evaluation
+order: preceding text may still be queued. See the
+[expression mapping documentation](https://neovim.io/doc/user/map.html#map-expression)
+for the `<Ignore>` pattern used by this plugin's mappings.
 
 ## Development
 
@@ -196,7 +249,8 @@ PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers ./tests/run.sh
 Tests use actual Neovim input and cursor positions in isolated XDG directories.
 They cover quotes, nesting, UTF-8 neighbors, backspace, Enter/indentation,
 undo/redo, dot repeat,
-configuration precedence, Tree-sitter literal/interpolation boundaries and
+configuration precedence, Python triple quotes and prefixes,
+Tree-sitter literal/interpolation boundaries and
 pending parses, completion/snippet-style buffer edits, macro/paste behavior,
 and mapping lifecycle. CI checks the minimum
 supported version and the current stable version, with pinned parser fixtures.

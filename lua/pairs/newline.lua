@@ -24,6 +24,15 @@ local function whitespace(columns)
   return string.rep(code("<C-v><Tab>"), tabs) .. string.rep(" ", columns - width)
 end
 
+function M.reset(columns, inner)
+  -- Ctrl-T establishes native indentation state even when indentexpr returned
+  -- -1. Native 0/Ctrl-D can then clear indentation on insertion and dot replay.
+  return (inner and code("<BS>") or "")
+    .. code("<C-t>0<C-d>")
+    .. whitespace(columns)
+    .. (inner and "x" or "")
+end
+
 -- Called by the expression register after native Enter has created the line.
 -- Return typed indentation commands without editing buffer text.
 function M.indent(inner)
@@ -46,15 +55,12 @@ function M.indent(inner)
   if not ok or type(width) ~= "number" or width < 0 then
     width = vim.fn.indent(row)
   end
-  return (inner and code("<BS>") or "")
-    .. code("0<C-d>")
-    .. whitespace(math.floor(width))
-    .. (inner and "x" or "")
+  return M.reset(math.floor(width), inner)
 end
 
-function M.keys()
+function M.keys(indent_offset)
   local first, last
-  if vim.bo.indentexpr ~= "" or vim.bo.cindent then
+  if indent_offset == nil and (vim.bo.indentexpr ~= "" or vim.bo.cindent) then
     -- Evaluate indentation after creating each line. The returned typed
     -- whitespace is recorded for dot replay, unlike a later API edit or Ctrl-F.
     first = "x" .. code("<C-r>=luaeval(\"require('pairs.newline').indent(true)\")<CR>")
@@ -63,8 +69,15 @@ function M.keys()
     local row = vim.api.nvim_win_get_cursor(0)[1]
     local indent = vim.api.nvim_get_current_line():match("^%s*") or ""
     local base = vim.fn.virtcol({ row, #indent + 1 }) - 1
-    first = code("0<C-d>") .. whitespace(base + vim.fn.shiftwidth(base)) .. "x"
-    last = code("0<C-d>") .. whitespace(base)
+    first = "x"
+      .. code(
+        string.format(
+          "<C-r>=luaeval(\"require('pairs.newline').reset(%d, true)\")<CR>",
+          base + (indent_offset or vim.fn.shiftwidth(base))
+        )
+      )
+    last =
+      code(string.format("<C-r>=luaeval(\"require('pairs.newline').reset(%d, false)\")<CR>", base))
   end
   -- A temporary, isolated word lets native Ctrl-Left return across the newline
   -- without ending the insertion. Native Delete removes it before returning.

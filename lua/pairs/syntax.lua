@@ -53,6 +53,19 @@ local function string_context(buf, node)
     literal_string = literal,
     string_quote = not literal and quote or nil,
     string_close = not literal and line(buf, er):sub(ec, ec) == quote and ec - 1 or nil,
+    string_empty = quote ~= nil and not triple and sr == er and ec == sc + #prefix + 2,
+    empty_quote = not triple and quote or nil,
+    string_prefix = prefix,
+    string_start = sc,
+    literal_delimiter = triple and string.rep(quote, 3) or nil,
+    literal_start_row = sr,
+    literal_open_col = quote and sc + #prefix or nil,
+    literal_close_row = er,
+    literal_close_col = triple
+        and not missing_end(node)
+        and line(buf, er):sub(ec - 2, ec) == string.rep(quote, 3)
+        and ec - 3
+      or nil,
   }
 end
 
@@ -154,10 +167,17 @@ function M.capture(buf, row, col, text)
   local root = tree:root()
   local node = root:named_descendant_for_range(row, left, row, left)
   local start = 0
+  local previous_string
   while node do
     local kind = node:type()
     local sr, sc, er, ec = node:range()
     local at_end = row == er and col == ec
+    if at_end and string_node(kind) and not missing_end(node) then
+      local previous = string_context(buf, node)
+      if previous.string_empty then
+        previous_string = previous
+      end
+    end
     local inside = not before(row, col, sr, sc)
       and (
         before(row, col, er, ec)
@@ -196,7 +216,7 @@ function M.capture(buf, row, col, text)
     node = node:parent()
   end
   local masked, reason = code_prefix(root, text, row, col, start)
-  return masked and { syntax = "code", lex_line = masked }
+  return masked and { syntax = "code", lex_line = masked, previous_string = previous_string }
     or { syntax = "unknown", syntax_reason = reason }
 end
 

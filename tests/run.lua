@@ -38,6 +38,7 @@ local function seed(marked, ft)
   vim.bo.indentkeys = "0{,0},0),0],:,0#,!^F,o,O,e"
   vim.bo.cinkeys = "0{,0},0),0],:,0#,!^F,o,O,e"
   vim.b.pairs_rules = nil
+  vim.b.pairs_multi_rules = nil
   vim.b.pairs_enabled = nil
   local start = assert(marked:find("│", 1, true), "missing cursor marker")
   local prefix, suffix = marked:sub(1, start - 1), marked:sub(start + #"│")
@@ -945,6 +946,44 @@ test("expr composes with fallback", function()
   vim.keymap.del("i", '"')
 end)
 
+test("typed prefix is applied before quote context", function()
+  input("│", "don't", "don't│")
+  input("│", 'word"', 'word"│')
+  input("│", '# "', '# "│', { treesitter = true }, "python")
+end)
+
+test("deferred mappings remove owned private aliases", function()
+  seed("│")
+  plugin.setup()
+  local owned = vim.deepcopy(require("pairs.mapping").owned)
+  plugin.teardown()
+  for _, mapping in ipairs(owned) do
+    eq(vim.fn.maparg(mapping.plug, "i"), "")
+  end
+end)
+
+test("private alias collision preserves the owner", function()
+  seed("│")
+  local plug = "<Plug>(pairs.nvim-34)"
+  vim.keymap.set("i", plug, "foreign")
+  plugin.setup()
+  eq(plugin.status().conflicts, { '"' })
+  plugin.teardown()
+  eq(vim.fn.maparg(plug, "i"), "foreign")
+  vim.keymap.del("i", plug)
+end)
+
+test("globally disabled quote survives partial filetype policies", function()
+  input("│", "'", "'│", { pairs = { ["'"] = false } }, "markdown")
+end)
+
+test("complete filetype quote rule can re-enable a disabled rule", function()
+  input("│", '"', '"│"', {
+    pairs = { ['"'] = false },
+    filetypes = { lua = { pairs = { ['"'] = { close = '"' } } } },
+  })
+end)
+
 test("paste bypasses pairing", function()
   local entry = seed("│")
   plugin.setup()
@@ -969,6 +1008,15 @@ test("macro recording and replay are literal", function()
   feed("A <Esc>@q")
   eq(vim.api.nvim_get_current_line(), '"" ')
 end)
+
+dofile("tests/triples.lua")({
+  test = test,
+  input = input,
+  seed = seed,
+  feed = feed,
+  eq = eq,
+  plugin = plugin,
+})
 
 plugin.teardown()
 if #failures > 0 then

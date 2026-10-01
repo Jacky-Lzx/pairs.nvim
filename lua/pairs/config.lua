@@ -6,6 +6,7 @@ M.defaults = {
   max_scan_bytes = 4096,
   treesitter = false,
   disabled_filetypes = { "TelescopePrompt", "snacks_picker_input" },
+  multi_pairs = {},
   pairs = {
     ["("] = { close = ")", open = true, skip = true, delete = true, newline = true },
     ["["] = { close = "]", open = true, skip = true, delete = true, newline = true },
@@ -54,6 +55,43 @@ local function validate_pairs(rules)
   end
 end
 
+local function validate_multi(rules)
+  assert(type(rules) == "table", "pairs: multi_pairs must be a table")
+  for open, rule in pairs(rules) do
+    assert(
+      open == '"""' or open == "'''",
+      "pairs: multi_pairs currently supports triple quotes only"
+    )
+    if rule ~= false then
+      if type(rule) == "table" and rule.close == nil then
+        rule.close = open
+      end
+      assert(
+        type(rule) == "table" and rule.close == open,
+        "pairs: triple quote closers must match the opener"
+      )
+      for _, key in ipairs({ "open", "skip", "delete", "newline" }) do
+        if rule[key] == nil then
+          rule[key] = true
+        end
+        assert(type(rule[key]) == "boolean", "pairs: multi rule." .. key .. " must be boolean")
+      end
+    end
+  end
+end
+
+local function merge_rules(base, overrides)
+  local rules = vim.tbl_deep_extend("force", vim.deepcopy(base), overrides or {})
+  for open, rule in pairs(overrides or {}) do
+    -- A partial policy cannot recreate a delimiter disabled by a previous
+    -- layer. Re-enabling it requires an explicit complete rule with a closer.
+    if base[open] == false and type(rule) == "table" and rule.close == nil then
+      rules[open] = false
+    end
+  end
+  return rules
+end
+
 function M.build(opts)
   assert(opts == nil or type(opts) == "table", "pairs: setup expects a table")
   local config = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), vim.deepcopy(opts or {}))
@@ -80,11 +118,15 @@ function M.build(opts)
     assert(type(ft) == "string", "pairs: disabled_filetypes entries must be strings")
   end
   validate_pairs(config.pairs)
+  validate_multi(config.multi_pairs)
   assert(type(config.filetypes) == "table", "pairs: filetypes must be a table")
   for ft, overrides in pairs(config.filetypes) do
     assert(type(ft) == "string" and type(overrides) == "table", "pairs: invalid filetype override")
-    local rules = vim.tbl_deep_extend("force", vim.deepcopy(config.pairs), overrides.pairs or {})
+    local rules = merge_rules(config.pairs, overrides.pairs)
     validate_pairs(rules)
+    validate_multi(
+      vim.tbl_deep_extend("force", vim.deepcopy(config.multi_pairs), overrides.multi_pairs or {})
+    )
     if overrides.enabled ~= nil then
       assert(type(overrides.enabled) == "boolean", "pairs: filetype enabled must be boolean")
     end
@@ -93,13 +135,19 @@ function M.build(opts)
 end
 
 function M.resolve(config, ft, buffer)
+  local rules = merge_rules(merge_rules(config.pairs, (config.filetypes[ft] or {}).pairs), buffer)
+  validate_pairs(rules)
+  return rules
+end
+
+function M.resolve_multi(config, ft, buffer)
   local rules = vim.tbl_deep_extend(
     "force",
-    vim.deepcopy(config.pairs),
-    (config.filetypes[ft] or {}).pairs or {},
+    vim.deepcopy(config.multi_pairs),
+    (config.filetypes[ft] or {}).multi_pairs or {},
     buffer or {}
   )
-  validate_pairs(rules)
+  validate_multi(rules)
   return rules
 end
 

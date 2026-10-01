@@ -1,6 +1,18 @@
 -- A bounded, line-local lexer. It deliberately does not pretend to parse a language.
 local M = {}
 
+function M.next_allows_pair(char, rules)
+  if char == "" or char:match("^%s$") or char == "," or char == ";" or char == ":" then
+    return true
+  end
+  for open, rule in pairs(rules) do
+    if rule ~= false and open ~= rule.close and char == rule.close then
+      return true
+    end
+  end
+  return false
+end
+
 function M.previous(text, col)
   if col == 0 then
     return ""

@@ -60,14 +60,37 @@ acceptance, LuaSnip navigation, Enter and native undo/dot. All three startup
 smoke profiles passed. Language-server responses and further injected-language
 contexts remain separate acceptance work.
 
+## Python triple-quote milestone (implemented)
+
+- Separate opt-in `multi_pairs` rules with global/filetype/buffer overrides.
+- Upgrade an empty short Python string only when parser boundaries prove its
+  position. Support both quote styles and Python string prefixes.
+- Skip the actual closing triple one quote at a time; preserve body quotes.
+- Delete an adjacent empty triple pair and expand it on Enter with its middle
+  and closing lines aligned with the opening line.
+- Preserve independent open/skip/delete/newline policies, mapping ownership,
+  native undo/redo, and dot repeat. Missing/pending parser context cannot
+  synthesize a triple pair.
+- Defer mapped context reads until preceding typed text has been applied,
+  covering continuous word/quote and prefixed-string input.
+- Reset native indentation before inserting recorded whitespace, including
+  Python indent callbacks that return -1 and counted dot repeat.
+- Enable both triple-quote rules in the user's local Python configuration.
+
+Validation: 277 cumulative real-input cases pass on Neovim 0.11.0 and 0.12.5
+with pinned parser fixtures; 175 cases pass without optional fixtures. The actual
+configuration passed 29 acceptance cases with installed blink.cmp and LuaSnip
+plugins, plus startup smoke for default/minimal/Python profiles. LSP responses
+remain separate acceptance work.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
    regression case before refining heuristics.
 2. Extend completion/snippet acceptance to more languages and real LSP sources,
    including auto-insert previews and semantic bracket resolution.
-3. Add opt-in language rules for Python triple quotes, Markdown fences, LaTeX,
-   and ambiguous angle brackets, with an explicit context/priority contract.
+3. Extend the opt-in multi-character contract to Markdown fences and LaTeX,
+   then evaluate ambiguous angle brackets with explicit context and priority.
 4. Measure real typing latency before considering caching or incremental scans.
 5. Expand beyond Insert mode only after its behavior has settled.
 

@@ -5,18 +5,6 @@ local function decision(action, reason, open, close)
   return { action = action, reason = reason, open = open, close = close }
 end
 
-local function next_allows_pair(char, rules)
-  if char == "" or char:match("^%s$") or char == "," or char == ";" or char == ":" then
-    return true
-  end
-  for open, rule in pairs(rules) do
-    if rule ~= false and open ~= rule.close and char == rule.close then
-      return true
-    end
-  end
-  return false
-end
-
 local function quote_can_open(prev, quotes)
   return not lex.word(prev) and not quotes[prev] and prev ~= "`"
 end
@@ -25,6 +13,10 @@ end
 function M.decide(ctx, key)
   if not ctx.enabled then
     return decision("pass", ctx.disabled_reason or "disabled")
+  end
+  local multi = require("pairs.multichar").decide(ctx, key)
+  if multi then
+    return multi
   end
   if ctx.syntax == "unknown" or ctx.literal_string then
     return decision(
@@ -98,7 +90,7 @@ function M.decide(ctx, key)
     if not quote_can_open(prev, ctx.lex.quotes) then
       return decision("pass", "quote_neighbor")
     end
-    if not next_allows_pair(next_char, ctx.rules) then
+    if not lex.next_allows_pair(next_char, ctx.rules) then
       return decision("pass", "next_character")
     end
     return decision("pair", "opening_quote", key, rule.close)
@@ -108,7 +100,7 @@ function M.decide(ctx, key)
     return decision("pass", "string")
   end
   if rule and rule ~= false then
-    if rule.open and next_allows_pair(next_char, ctx.rules) then
+    if rule.open and lex.next_allows_pair(next_char, ctx.rules) then
       return decision("pair", "opening_bracket", key, rule.close)
     end
     return decision("pass", rule.open and "next_character" or "opening_disabled")

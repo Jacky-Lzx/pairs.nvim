@@ -75,6 +75,8 @@ function M.capture(config, global_enabled, assume_insert)
     enabled = enabled,
     disabled_reason = reason,
     rules = rules,
+    multi_rules = require("pairs.config").resolve_multi(config, ft, vim.b[buf].pairs_multi_rules),
+    row = cursor[1] - 1,
     lex = {
       max_scan_bytes = config.max_scan_bytes,
       line_comments = comments[ft] or {},
