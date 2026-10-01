@@ -332,7 +332,11 @@ before the owner's native fallback. See the blink.cmp example in README.md.
 
 FAST WRAP                                                *pairs-fast-wrap*
 
-Wraps the next same-line identifier after a standard opening bracket:
+Wraps the next same-line identifier or dotted member chain after a standard
+opening bracket:
+  (|obj.value    -> (obj.value)|
+  (|obj.value)   -> (obj.value)|
+  (|)obj.value   -> (obj.value)|
   (|value        -> (value)|   insert a missing closer
   (|value)       -> (value)|   reuse an immediately following closer
   (|)value       -> (value)|
@@ -357,11 +361,14 @@ expression pattern described in |map-expression|.
 Type ( before existing text, then invoke fast wrap to supply its missing closer.
 The existing normal opening policy is unchanged. The cursor must immediately
 follow (, [ or {, with the target after the cursor or an adjacent closer.
-Targets match ASCII identifiers
-[A-Za-z_][A-Za-z0-9_]*. Unicode identifiers, leading whitespace, padded pairs,
-quotes, calls/member access/indexing and immediately adjoining operators do not
-wrap. End of line, whitespace, commas, semicolons and standard closing brackets
-terminate a target. Following text stays unchanged; only one identifier wraps.
+Each identifier matches [A-Za-z_][A-Za-z0-9_]*. Member chains join these with
+single dots and no whitespace, e.g. self.name or config.options.enabled.
+Incomplete members, repeated dots, Unicode identifiers, leading whitespace,
+padded pairs, quotes, calls, indexing and immediately adjoining operators do not
+wrap. Unsupported chains such as obj.value(), obj.value[0], obj?.value and obj.
+stay untouched. End of line, whitespace, commas, semicolons and standard closing
+brackets terminate a target. Following text stays unchanged; the whole chain
+wraps.
 A matching closer must immediately follow the target to be reused. Spaces and
 other suffix text are preserved. Reuse follows current bracket nesting; other
 unclosed outer brackets are not repaired.
@@ -376,7 +383,7 @@ Changing a standard closer to a custom one disables inherited wrapping, keeping
 existing custom rules valid. Explicit wrap=true requires a standard pair.
 
 Native movement and any required deletion/insertion retain undo/redo/dot. Dot replays the
-recorded movement length, without choosing a new identifier. Inspect with
+recorded movement length, without choosing a new target. Inspect with
 :PairsInspect <FastWrap>. Traces record logical key <FastWrap>, wrap policy and
 target length, remove_close and insert_close flags (including false values).
 Reproduce exports via fast_wrap() or expr('<FastWrap>');

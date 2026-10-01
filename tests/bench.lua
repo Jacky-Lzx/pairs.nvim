@@ -206,6 +206,34 @@ local cases = {
     action = "wrap",
   },
   {
+    name = "fast-wrap-member-adjacent",
+    line = "()config.options.enabled",
+    col = 1,
+    key = "<FastWrap>",
+    action = "wrap",
+  },
+  {
+    name = "fast-wrap-member-missing",
+    line = "(config.options.enabled",
+    col = 1,
+    key = "<FastWrap>",
+    action = "wrap",
+  },
+  {
+    name = "fast-wrap-member-reuse",
+    line = "(config.options.enabled)",
+    col = 1,
+    key = "<FastWrap>",
+    action = "wrap",
+  },
+  {
+    name = "fast-wrap-member-long",
+    line = "(" .. string.rep("a.", 1000) .. "z)",
+    col = 1,
+    key = "<FastWrap>",
+    action = "wrap",
+  },
+  {
     name = "padded-closer-skip",
     line = "( value )",
     col = 7,
@@ -481,6 +509,30 @@ mapped(
   "mapped-opener-reuse",
   "value)" .. string.rep("<C-g>U<Left>", 6) .. "(<F8>x",
   { "(value)x" },
+  false,
+  3,
+  { mappings = { fast_wrap = "<F8>" } }
+)
+mapped(
+  "mapped-member-adjacent",
+  "()obj.value" .. string.rep("<C-g>U<Left>", 10) .. "<F8>x",
+  { "(obj.value)x" },
+  false,
+  3,
+  { mappings = { fast_wrap = "<F8>" } }
+)
+mapped(
+  "mapped-member-missing",
+  "obj.value" .. string.rep("<C-g>U<Left>", 9) .. "(<F8>x",
+  { "(obj.value)x" },
+  false,
+  2,
+  { mappings = { fast_wrap = "<F8>" } }
+)
+mapped(
+  "mapped-member-reuse",
+  "obj.value)" .. string.rep("<C-g>U<Left>", 10) .. "(<F8>x",
+  { "(obj.value)x" },
   false,
   3,
   { mappings = { fast_wrap = "<F8>" } }

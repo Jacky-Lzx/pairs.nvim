@@ -19,15 +19,23 @@ function M.decide(ctx, state)
     return { action = "pass", reason = "interpolation_boundary" }
   end
   -- Count the complete prefix plus forward target against the existing budget.
-  -- One lookahead byte proves the identifier ends without scanning the suffix.
+  -- One lookahead byte proves the chain ends without scanning the suffix.
   local remove_close = ctx.line:sub(ctx.col + 1, ctx.col + 1) == rule.close
   local offset = remove_close and 1 or 0
-  local target =
-    ctx.line:sub(ctx.col + offset + 1, ctx.lex.max_scan_bytes + 1):match("^[A-Za-z_][A-Za-z0-9_]*")
-  if not target then
+  local target = ctx.line:sub(ctx.col + offset + 1, ctx.lex.max_scan_bytes + 1)
+  local _, length = target:find("^[A-Za-z_][A-Za-z0-9_]*")
+  if not length then
     return { action = "pass", reason = "no_identifier" }
   end
-  local last = ctx.col + offset + #target
+  -- Every dot must have a complete ASCII member; never wrap a partial chain.
+  while target:sub(length + 1, length + 1) == "." do
+    local _, member_end = target:find("^[A-Za-z_][A-Za-z0-9_]*", length + 2)
+    if not member_end then
+      return { action = "pass", reason = "complex_target" }
+    end
+    length = member_end
+  end
+  local last = ctx.col + offset + length
   if last > ctx.lex.max_scan_bytes then
     return { action = "pass", reason = "scan_limit" }
   end
@@ -42,7 +50,7 @@ function M.decide(ctx, state)
       or "identifier_wrap_missing_closer",
     open = open,
     close = rule.close,
-    move = #target,
+    move = length,
     remove_close = remove_close,
     insert_close = remove_close or after ~= rule.close,
   }

@@ -43,7 +43,7 @@ return function(h)
     end)
   end
   for _, before in ipairs({
-    "(│value.name",
+    "(│value.",
     "(│fn()",
     "(│items[0]",
     "(│value+tail",

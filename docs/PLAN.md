@@ -450,6 +450,35 @@ parser-free smoke passes 17 decisions and the same ten mapped cases. Startup
 profiles, executable README/help examples on both versions, help tags, health,
 formatting and diff checks pass.
 
+## Same-line member chain fast wrap milestone (implemented)
+
+- Extend all three fast-wrap modes to identifier(.identifier)* targets, including
+  self.name and config.options.enabled. Keep the same API, shortcuts, wrap policy
+  and native-key renderer. Existing identifier decision reasons and trace schema
+  remain compatible; movement length now covers the full contiguous chain.
+- Match each ASCII member in the bounded forward window. Every dot requires a
+  member; reject malformed/Unicode chains, calls, indexing and adjoining operators
+  without wrapping a partial target. The complete prefix, adjacent closer and
+  all members share max_scan_bytes, with one byte of boundary lookahead.
+- Preserve suffix text, immediate-closer reuse, pure-movement invariants,
+  undo/redo/dot, live policies, single prefix scan and syntax/pending guards.
+  Add mapped benchmark cases for all three modes and a long-chain decision.
+
+Validation: 1557 cumulative real-input tests pass on Neovim 0.11.0 and 0.12.5
+with pinned parser fixtures; 749 pass without fixtures. The 60 new cases cover
+all standard pairs/modes, typed-opener and adjacent-pair undo/redo/dot, long
+chains and budget cuts, unsupported targets, suffixes, live policies, edits,
+trace export/replay, multiline strings/comments, interpolation and pending syntax.
+The actual local configuration passes 295 input cases with real blink.cmp and
+LuaSnip, including member insertion/reuse in active snippet placeholders and
+subsequent navigation. All 172 tracked configuration files retain their original
+bytes; external LSP startup remains stubbed. Default/minimal/Python startup,
+executable README/help examples on both versions, help tags and health pass.
+
+Stable/minimum-version benchmarks pass 30 decisions and 13 mapped cases;
+parser-free smoke passes 21 decisions and the same 13 mapped cases, including
+text and undo/redo/dot assertions. Formatting and diff checks pass.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a

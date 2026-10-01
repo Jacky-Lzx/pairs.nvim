@@ -1135,6 +1135,15 @@ dofile("tests/fast_wrap_opener.lua")({
   plugin = plugin,
 })
 
+dofile("tests/fast_wrap_member.lua")({
+  test = test,
+  input = input,
+  seed = seed,
+  feed = feed,
+  eq = eq,
+  plugin = plugin,
+})
+
 plugin.teardown()
 if #failures > 0 then
   io.stderr:write(table.concat(failures, "\n\n") .. "\n")

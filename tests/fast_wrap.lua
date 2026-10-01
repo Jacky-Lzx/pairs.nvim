@@ -34,7 +34,7 @@ return function(h)
     { "numeric target", "(│)42" },
     { "Unicode target", "(│)中文" },
     { "Unicode identifier suffix", "(│)café" },
-    { "member access", "(│)obj.name" },
+    { "incomplete member access", "(│)obj." },
     { "function call", "(│)fn()" },
     { "indexing", "(│)items[0]" },
     { "operator without a boundary", "(│)value+other" },

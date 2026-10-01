@@ -4,8 +4,8 @@ A small, conservative auto-pairs plugin for Neovim, with quote behavior as the
 first priority. Pure Lua; Neovim 0.11 or newer; no runtime dependencies.
 
 It handles Insert-mode quotes, brackets, matching-closer skipping, empty-pair
-backspace, empty-bracket expansion on Enter, and explicit same-line identifier
-wrapping. Python triple quotes,
+backspace, empty-bracket expansion on Enter, and explicit same-line wrapping of
+identifiers and member chains. Python triple quotes,
 JavaScript/TypeScript templates, Markdown fences and LaTeX math delimiters are
 available as opt-in rules. Other multi-character delimiters, general expression/
 selection wrapping, and command-line mode are planned.
@@ -539,7 +539,7 @@ end, { expr = true, replace_keycodes = false })
 
 - `expr(key)` returns Neovim keycodes when handled, or `nil` for fallback.
 - `handle(key)` returns the handled keycodes or the original keycodes.
-- `fast_wrap()` returns keycodes to wrap the next identifier, or `nil` for fallback.
+- `fast_wrap()` returns keycodes to wrap the next identifier or member chain, or `nil` for fallback.
 - `explain(key)` returns the action and reason without changing text. Call it
   in Insert mode to inspect the actual insertion cursor. `:PairsInspect {key}`
   previews insertion **before** the Normal-mode cursor.
@@ -559,14 +559,17 @@ for the `<Ignore>` pattern used by this plugin's mappings.
 
 ## Fast wrap
 
-Fast wrap encloses the next same-line ASCII identifier after an opening `(`,
-`[` or `{`, leaving the cursor after its closer. It inserts a missing closer,
-reuses one immediately after the identifier, or moves an adjacent empty pair's
-closer around the identifier:
+Fast wrap encloses the next same-line ASCII identifier or dotted member chain
+after an opening `(`, `[` or `{`, leaving the cursor after its closer. It inserts
+a missing closer, reuses one immediately after the target, or moves an adjacent
+empty pair's closer around the target:
 
 | Before | Action | After |
 | --- | --- | --- |
 | `(│value` | fast wrap | `(value)│` |
+| `(│obj.value` | fast wrap | `(obj.value)│` |
+| `(│obj.value)` | fast wrap | `(obj.value)│` |
+| `(│)config.options.enabled` | fast wrap | `(config.options.enabled)│` |
 | `(│value)` | fast wrap | `(value)│` |
 | `(│)value` | fast wrap | `(value)│` |
 | `[│]item_2` | fast wrap | `[item_2]│` |
@@ -593,13 +596,16 @@ as the plugin's owned shortcut.
 Type `(` at `│value`, then invoke the shortcut to produce `(value)│`. The normal
 opening policy remains the same; fast wrap explicitly supplies the missing
 closer. The cursor must be immediately after the opening bracket, with the
-identifier directly after the cursor or an adjacent closer. Identifiers match
-`[A-Za-z_][A-Za-z0-9_]*`; Unicode identifiers, leading whitespace, padding,
-quotes, calls, member access, indexing and immediately adjoining operators are
-outside this version's target support. End of line, whitespace, commas,
-semicolons and standard closing brackets terminate a target; any following text
-is preserved. Only the first identifier is wrapped, never a full expression.
-An existing matching closer must immediately follow the identifier to be reused;
+target directly after the cursor or an adjacent closer. Each identifier matches
+`[A-Za-z_][A-Za-z0-9_]*`; a chain joins these identifiers with single dots and
+no intervening whitespace, such as `self.name` or `config.options.enabled`.
+Incomplete members, repeated dots, Unicode identifiers, leading whitespace,
+padding, quotes, calls, indexing and immediately adjoining operators are
+outside this version's target support. Unsupported chains are left untouched,
+including `obj.value()`, `obj.value[0]`, `obj?.value` and `obj.`.
+End of line, whitespace, commas, semicolons and standard closing brackets
+terminate a target; following text is preserved. The whole dotted chain wraps.
+An existing matching closer must immediately follow the target to be reused;
 spaces and other suffix text are preserved. Reuse follows the current bracket
 nesting and does not repair other unclosed outer brackets.
 
@@ -610,7 +616,7 @@ Changing a standard closer to a custom one disables inherited wrapping;
 existing custom rules remain valid. Explicit `wrap = true` requires a standard pair.
 Strings/comments, unsafe/pending syntax, escaped/unmatched prefixes and
 structural interpolation delimiters do not wrap. The complete same-line prefix
-and identifier share `max_scan_bytes`, with one boundary-lookahead byte.
+and target share `max_scan_bytes`, with one boundary-lookahead byte.
 Missing parsers retain the existing line-local lexer fallback.
 
 Native movement and any required deletion/insertion preserve undo/redo and dot repeat; dot

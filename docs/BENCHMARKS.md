@@ -57,7 +57,9 @@ batches. Other scenarios keep their default rules; padding and skip_space are
 not implicitly enabled for the ordinary baseline.
 Fast wrap checks adjacent-closer movement, missing-closer insertion and existing
 closer reuse in both bounded decisions and mapped cases, including text and
-undo/redo/dot checks. Its shortcut is enabled only in those mapped cases.
+undo/redo/dot checks. These three modes also exercise dotted member chains;
+a long chain checks bounded forward scanning. Its shortcut is enabled only in
+those mapped cases.
 
 Neither metric measures physical keyboard-to-screen latency: these are headless
 runs without UI rendering, real completion/LSP responses or OS event delivery.
