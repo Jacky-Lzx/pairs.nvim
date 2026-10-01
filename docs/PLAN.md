@@ -107,14 +107,36 @@ multiline HTML tagged templates. Default/minimal/Python startup smoke passes.
 React completion keeps blink's existing kind-resolution policy; LSP semantic
 token responses remain separate acceptance work.
 
+## Markdown fence milestone (implemented)
+
+- Opt-in triple-backtick fence expansion on Enter at the end of a new opening
+  line, preserving the language/info string and zero to three indentation spaces.
+- Add the closing fence through native input commands; cursor stays on the
+  middle line. Undo/redo and counted dot repeat retain the entire insertion.
+- Ordinary Enter reuses existing closers and preserves existing body content.
+- Parser-confirmed closing backticks skip individually, including longer closers.
+- The outer Markdown tree owns delimiters independently of injected code trees.
+- Inline code, HTML, indented code, longer/tilde openers and list/blockquote
+  fences keep ordinary behavior. Whole-block deletion is outside this increment.
+- Preserve the blink.cmp accept/Enter fallback chain and enable the rule in the
+  user's local Markdown configuration.
+
+Validation: 570 cumulative tests pass on Neovim 0.11.0 and 0.12.5; 245 tests
+pass without extra parser fixtures. Markdown and C injection checks use the
+bundled grammars. The user's actual configuration passes 75 input cases with
+blink.cmp language completion, auto brackets and LuaSnip, plus default/minimal/
+Python startup smoke. External LSP responses remain separate acceptance work.
+Help tags, health checks, formatting and diff checks pass.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
    regression case before refining heuristics.
 2. Extend completion/snippet acceptance to more languages and real LSP sources,
    including auto-insert previews and semantic bracket resolution.
-3. Extend the opt-in multi-character contract to Markdown fences and LaTeX,
-   then evaluate ambiguous angle brackets with explicit context and priority.
+3. Extend Markdown fences to list/blockquote containers and longer/tilde openers,
+   then add opt-in LaTeX rules. Evaluate ambiguous angle brackets with explicit
+   context and priority.
 4. Measure real typing latency before considering caching or incremental scans.
 5. Expand beyond Insert mode only after its behavior has settled.
 

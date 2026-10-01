@@ -23,7 +23,7 @@ Options:
   treesitter           use installed parsers for syntax context, default false
   disabled_filetypes   list of disabled filetypes
   pairs                table keyed by opening delimiter; false disables a rule
-  multi_pairs          opt-in triples and template interpolation, default {}
+  multi_pairs          opt-in triples, template interpolation, fences; default {}
   filetypes            filetype -> { pairs, multi_pairs, enabled } overrides
 
 Rules contain close (single ASCII character), open, skip, delete, and newline
@@ -103,6 +103,38 @@ newline flags, all true. Overrides follow global/filetype/buffer precedence.
 Backtick, interpolation and ordinary brace rules work independently.
 Advanced template handling needs current parser context. Missing parsers use
 the line-local lexer; pending parses preserve original keys.
+
+MARKDOWN CODE FENCES                                      *pairs-fences*
+
+Opt-in, with treesitter=true and an installed Markdown parser: >lua
+    require('pairs').setup({
+      treesitter = true,
+      filetypes = { markdown = { multi_pairs = { ['```'] = {} } } },
+    })
+<
+At the end of a new opening line with exactly three backticks and an optional
+language/info string, <CR> adds a middle and closing line. The cursor remains
+on the middle line. The info string is retained; both lines use the opening
+line's indentation, which may contain zero to three spaces.
+
+Existing body content or a closing fence uses ordinary Enter. At a confirmed
+closing delimiter, each backtick skips one character; longer closing fences
+are recognized. The outer Markdown block tree owns these boundaries even when
+the body has an injected code-language parser.
+
+The initial rule supports top-level triple-backtick openers. Inline code, HTML,
+indented code, longer/tilde openers and list/blockquote fences keep ordinary
+input behavior. The rule does not enable inline backtick pairing. Enter inside
+the info string also stays ordinary. See CommonMark 4.5 for the syntax contract.
+
+close defaults to '```'; open/newline/skip default to true. Expansion requires
+both open and newline. false disables the rule. Overrides follow global,
+filetype, then b:pairs_multi_rules. Backspace stays ordinary; delete=true is
+unsupported and rejected. Undo/redo and dot retain the complete insertion.
+Missing/pending parser context preserves original keys.
+
+For a completion-owned Enter, use the usual accept -> expr('<CR>') -> fallback
+chain. Language completion is accepted first; a subsequent Enter expands.
 
 ENTER                                                    *pairs-enter*
 

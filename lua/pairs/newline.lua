@@ -58,7 +58,7 @@ function M.indent(inner)
   return M.reset(math.floor(width), inner)
 end
 
-function M.keys(indent_offset)
+function M.keys(indent_offset, insert_close)
   local first, last
   if indent_offset == nil and (vim.bo.indentexpr ~= "" or vim.bo.cindent) then
     -- Evaluate indentation after creating each line. The returned typed
@@ -82,7 +82,14 @@ function M.keys(indent_offset)
   -- A temporary, isolated word lets native Ctrl-Left return across the newline
   -- without ending the insertion. Native Delete removes it before returning.
   -- Every text/motion command is recorded by Neovim for undo and dot replay.
-  return code("<CR>") .. first .. code("<CR>") .. last .. code("<C-g>U<C-Left><Del>")
+  local closing = insert_close or ""
+  return code("<CR>")
+    .. first
+    .. code("<CR>")
+    .. last
+    .. closing
+    .. string.rep(code("<C-g>U<Left>"), #closing)
+    .. code("<C-g>U<C-Left><Del>")
 end
 
 return M

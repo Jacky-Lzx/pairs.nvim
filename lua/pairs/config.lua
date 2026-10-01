@@ -59,8 +59,8 @@ local function validate_multi(rules)
   assert(type(rules) == "table", "pairs: multi_pairs must be a table")
   for open, rule in pairs(rules) do
     assert(
-      open == '"""' or open == "'''" or open == "${",
-      "pairs: multi_pairs supports Python triple quotes and template interpolation only"
+      open == '"""' or open == "'''" or open == "${" or open == "```",
+      "pairs: unsupported multi-character delimiter"
     )
     if rule ~= false then
       if type(rule) == "table" and rule.close == nil then
@@ -72,10 +72,11 @@ local function validate_multi(rules)
       )
       for _, key in ipairs({ "open", "skip", "delete", "newline" }) do
         if rule[key] == nil then
-          rule[key] = true
+          rule[key] = open ~= "```" or key ~= "delete"
         end
         assert(type(rule[key]) == "boolean", "pairs: multi rule." .. key .. " must be boolean")
       end
+      assert(open ~= "```" or not rule.delete, "pairs: Markdown fence deletion is not supported")
     end
   end
 end

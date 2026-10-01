@@ -14,7 +14,7 @@ return function(h)
   end
 
   test("multi: unsupported delimiters are rejected", function()
-    eq(pcall(plugin.setup, { multi_pairs = { ["```"] = { close = "```" } } }), false)
+    eq(pcall(plugin.setup, { multi_pairs = { ["$$"] = { close = "$$" } } }), false)
   end)
   test("multi: mismatched closer is rejected", function()
     eq(pcall(plugin.setup, { multi_pairs = { [double] = { close = single } } }), false)

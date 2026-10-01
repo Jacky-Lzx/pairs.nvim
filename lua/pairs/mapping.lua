@@ -90,7 +90,7 @@ function M.render(result)
   elseif result.action == "delete" then
     return string.rep(keycode("<BS>"), #result.open) .. string.rep(keycode("<Del>"), #result.close)
   elseif result.action == "newline" then
-    return require("pairs.newline").keys(result.indent_offset)
+    return require("pairs.newline").keys(result.indent_offset, result.insert_close and result.close)
   end
 end
 

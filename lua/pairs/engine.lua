@@ -14,6 +14,10 @@ function M.decide(ctx, key)
   if not ctx.enabled then
     return decision("pass", ctx.disabled_reason or "disabled")
   end
+  local fence = require("pairs.fence").decide(ctx, key)
+  if fence then
+    return fence
+  end
   local template = require("pairs.template").decide(ctx, key)
   if template then
     return template

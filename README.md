@@ -4,9 +4,10 @@ A small, conservative auto-pairs plugin for Neovim, with quote behavior as the
 first priority. Pure Lua; Neovim 0.11 or newer; no runtime dependencies.
 
 It handles Insert-mode quotes, brackets, matching-closer skipping, empty-pair
-backspace, and empty-bracket expansion on Enter. Python triple quotes and
-JavaScript/TypeScript templates are available as opt-in rules. Other
-multi-character delimiters, wrapping, and command-line mode are planned.
+backspace, and empty-bracket expansion on Enter. Python triple quotes,
+JavaScript/TypeScript templates and Markdown fences are available as opt-in
+rules. Other multi-character delimiters, wrapping, and command-line mode are
+planned.
 
 ## Local installation
 
@@ -90,7 +91,7 @@ Defaults are `()`, `[]`, `{}`, `""`, and `''`. Rules are merged in the order
 global defaults → global configuration → filetype → buffer. Delimiters must be
 single printable ASCII characters; closing delimiters must be unambiguous.
 Multi-character rules use the separate `multi_pairs` option described below.
-Code fences and `$$` are not supported yet. Do not enable `<>` globally unless
+LaTeX `$$` is not supported yet. Do not enable `<>` globally unless
 you want it to pair operators. To re-enable an entire single-character rule
 disabled with `false`, provide its `close` value along with the override.
 
@@ -216,6 +217,46 @@ Advanced template handling requires current parser context; missing parsers
 use the line-local lexer, and pending parses preserve the original key.
 Rules follow the [ECMAScript template syntax](https://tc39.es/ecma262/multipage/ecmascript-language-lexical-grammar.html#sec-template-literal-lexical-components).
 
+## Markdown code fences
+
+Enable the triple-backtick fence rule with an installed Markdown parser:
+
+```lua
+require("pairs").setup({
+  treesitter = true,
+  filetypes = { markdown = { multi_pairs = { ["```"] = {} } } },
+})
+```
+
+At the end of a new opening line, type three backticks and an optional language
+name, then press Enter. The plugin creates a blank middle line and a matching
+closing line, placing the cursor on the middle line. The language/info string
+is preserved. Content and closing indentation match the opening line, including
+its zero to three leading spaces.
+
+An opening line with existing code content or a closing fence uses ordinary
+Enter, keeping the existing block intact. Closing fences are skipped one
+backtick at a time only at parser-confirmed closing positions; longer closing
+fences are recognized. Markdown's outer block tree owns these positions even
+when the body has an injected code-language parser.
+
+The rule is opt-in and supports top-level fences with exactly three opening
+backticks. Inline code, HTML blocks, four-space indented code, longer/tilde
+openers, list/blockquote fences, and Enter within the info string keep their
+ordinary input behavior. The rule does not enable inline backtick pairing.
+Its context checks follow [CommonMark fence syntax](https://spec.commonmark.org/0.31.2/#fenced-code-blocks).
+
+`multi_pairs["```"]` has implicit `close = "```"`; `open`, `newline` and `skip`
+default to `true`. Both `open` and `newline` must be enabled for expansion.
+`false` disables the entire rule. Global/filetype/`vim.b.pairs_multi_rules`
+precedence is unchanged. Backspace remains ordinary deletion; `delete = true`
+is unsupported and rejected. Undo/redo and dot repeat retain the entire
+insertion. Missing/pending parser context preserves the original key.
+
+When blink.cmp owns Enter, keep the existing accept → `pairs.expr("<CR>")` →
+fallback chain. Accepting a language-name completion does not expand the fence;
+the following Enter does.
+
 ## Mappings and completion
 
 Setup preserves existing global mappings and leaves buffer mappings alone.
@@ -298,7 +339,8 @@ Tests use actual Neovim input and cursor positions in isolated XDG directories.
 They cover quotes, nesting, UTF-8 neighbors, backspace, Enter/indentation,
 undo/redo, dot repeat,
 configuration precedence, Python triple quotes and prefixes, JavaScript/TypeScript
-templates, tagged/nested templates and interpolation,
+templates, tagged/nested templates and interpolation, Markdown fence boundaries
+and code-language injections,
 Tree-sitter literal/interpolation boundaries and
 pending parses, completion/snippet-style buffer edits, macro/paste behavior,
 and mapping lifecycle. CI checks the minimum

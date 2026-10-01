@@ -80,6 +80,50 @@ local function string_context(buf, node)
   }
 end
 
+local function markdown_fence(buf, parser, range)
+  local tree = parser:tree_for_range(range)
+  if not tree then
+    return nil
+  end
+  local node = tree:root():named_descendant_for_range(unpack(range))
+  while node do
+    if node:type() == "fenced_code_block" then
+      local opening = node:named_child(0)
+      local last = node:named_child(node:named_child_count() - 1)
+      if not opening or opening:type() ~= "fenced_code_block_delimiter" then
+        return nil
+      end
+      local row = opening:range()
+      local indent, ticks = line(buf, row):match("^( *)(`+)[^`]*$")
+      local result = {
+        open_row = row,
+        supported = indent ~= nil and #indent <= 3 and ticks == "```",
+        has_content = false,
+      }
+      -- The block has at most a few direct children. Content descendants are
+      -- not traversed, so large code blocks do not add scanning work.
+      for child in node:iter_children() do
+        if child:type() == "code_fence_content" then
+          result.has_content = true
+        end
+      end
+      if
+        node:named_child_count() > 1
+        and last:type() == "fenced_code_block_delimiter"
+        and not last:missing()
+      then
+        local cr = last:range()
+        local spaces, run = line(buf, cr):match("^( *)(`+)[ \t]*$")
+        if spaces and #spaces <= 3 and #run >= 3 then
+          result.close_row, result.close_col, result.close_end = cr, #spaces, #spaces + #run
+        end
+      end
+      return result
+    end
+    node = node:parent()
+  end
+end
+
 -- Only mask completed strings/comments in the current line prefix. Binary
 -- search avoids visiting every preceding statement in a large buffer.
 local function code_prefix(root, text, row, col, start)
@@ -177,12 +221,17 @@ function M.capture(buf, row, col, text)
   if not parser:is_valid(false, range) then
     return { syntax = "unknown" }
   end
+  local fence = parser:lang() == "markdown" and markdown_fence(buf, parser, range) or nil
+  local function with_fence(context)
+    context.fence = fence
+    return context
+  end
   -- Tagged templates can inject HTML/SQL/etc. Those trees do not contain the
   -- template's delimiters or substitutions; the outer JS/TS grammar owns them.
   local language = template_languages[parser:lang()] and parser or parser:language_for_range(range)
   local tree = language:tree_for_range(range)
   if not tree then
-    return { syntax = "unknown" }
+    return with_fence({ syntax = "unknown" })
   end
   local root = tree:root()
   local node = root:named_descendant_for_range(row, left, row, left)
@@ -207,9 +256,9 @@ function M.capture(buf, row, col, text)
       )
     if inside then
       if kind:find("comment", 1, true) then
-        return { syntax = "comment" }
+        return with_fence({ syntax = "comment" })
       elseif string_node(kind) then
-        return string_context(buf, node)
+        return with_fence(string_context(buf, node))
       elseif
         kind == "template_substitution"
         or kind == "interpolation"
@@ -234,26 +283,24 @@ function M.capture(buf, row, col, text)
           if suffix then
             local fr, fc = suffix:range()
             if before(fr, fc, row, col) then
-              return { syntax = "string", literal_string = true }
+              return with_fence({ syntax = "string", literal_string = true })
             end
           end
         end
         break
       elseif kind == "format_specifier" or kind == "type_conversion" then
-        return { syntax = "string", literal_string = true }
+        return with_fence({ syntax = "string", literal_string = true })
       end
     end
     node = node:parent()
   end
   local masked, reason = code_prefix(root, text, row, col, start)
-  return masked
-      and {
-        syntax = "code",
-        lex_line = masked,
-        previous_string = previous_string,
-        substitution = substitution,
-      }
-    or { syntax = "unknown", syntax_reason = reason }
+  return with_fence(masked and {
+    syntax = "code",
+    lex_line = masked,
+    previous_string = previous_string,
+    substitution = substitution,
+  } or { syntax = "unknown", syntax_reason = reason })
 end
 
 return M
