@@ -59,7 +59,12 @@ local function validate_multi(rules)
   assert(type(rules) == "table", "pairs: multi_pairs must be a table")
   for open, rule in pairs(rules) do
     assert(
-      open == '"""' or open == "'''" or open == "${" or open == "```" or open == "~~~",
+      open == '"""'
+        or open == "'''"
+        or open == "${"
+        or open == "```"
+        or open == "~~~"
+        or open == "$$",
       "pairs: unsupported multi-character delimiter"
     )
     if rule ~= false then

@@ -36,3 +36,14 @@ for language in typescript tsx; do
     "$build_tmp/typescript/$language/src/scanner.c" \
     -o "$fixture_root/parser/$language.so"
 done
+
+# The official npm release includes generated LaTeX C sources (the Git checkout
+# does not). Pin the release; no npm install or Tree-sitter CLI is required.
+curl --fail --silent --show-error --location --retry 3 \
+  "https://registry.npmjs.org/@pfoerster/tree-sitter-latex/-/tree-sitter-latex-0.6.0.tgz" \
+  -o "$build_tmp/latex.tar.gz"
+mkdir "$build_tmp/latex"
+tar -xzf "$build_tmp/latex.tar.gz" -C "$build_tmp/latex" --strip-components=1
+"${CC:-cc}" "$link_flag" -fPIC -O2 -I "$build_tmp/latex/src" \
+  "$build_tmp/latex/src/parser.c" "$build_tmp/latex/src/scanner.c" \
+  -o "$fixture_root/parser/latex.so"

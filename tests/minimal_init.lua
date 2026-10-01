@@ -8,7 +8,7 @@ vim.o.tabstop = 4
 vim.o.showmode = false
 vim.o.report = 9999
 
--- Optional pinned parser fixtures for Python, Rust and JavaScript coverage.
+-- Optional pinned parser fixtures, including LaTeX, Python, Rust and JS/TS.
 if vim.env.PAIRS_TEST_PARSER_ROOT then
   vim.opt.runtimepath:append(vim.env.PAIRS_TEST_PARSER_ROOT)
 end

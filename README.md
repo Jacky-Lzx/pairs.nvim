@@ -5,8 +5,8 @@ first priority. Pure Lua; Neovim 0.11 or newer; no runtime dependencies.
 
 It handles Insert-mode quotes, brackets, matching-closer skipping, empty-pair
 backspace, and empty-bracket expansion on Enter. Python triple quotes,
-JavaScript/TypeScript templates and Markdown fences are available as opt-in
-rules. Other multi-character delimiters, wrapping, and command-line mode are
+JavaScript/TypeScript templates, Markdown fences and LaTeX display dollars are
+available as opt-in rules. Other multi-character delimiters, wrapping, and command-line mode are
 planned.
 
 ## Local installation
@@ -91,8 +91,7 @@ Defaults are `()`, `[]`, `{}`, `""`, and `''`. Rules are merged in the order
 global defaults → global configuration → filetype → buffer. Delimiters must be
 single printable ASCII characters; closing delimiters must be unambiguous.
 Multi-character rules use the separate `multi_pairs` option described below.
-LaTeX `$$` is not supported yet. Do not enable `<>` globally unless
-you want it to pair operators. To re-enable an entire single-character rule
+Do not enable `<>` globally unless you want it to pair operators. To re-enable an entire single-character rule
 disabled with `false`, provide its `close` value along with the override.
 
 Per-buffer overrides:
@@ -284,6 +283,53 @@ When blink.cmp owns Enter, keep the existing accept → `pairs.expr("<CR>")` →
 fallback chain. Accepting a language-name completion does not expand the fence;
 the following Enter does.
 
+## LaTeX display dollars
+
+Enable the rule with an installed `latex` Tree-sitter parser:
+
+```lua
+require("pairs").setup({
+  treesitter = true,
+  filetypes = {
+    tex = { multi_pairs = { ["$$"] = {} } },
+    plaintex = { multi_pairs = { ["$$"] = {} } },
+  },
+})
+```
+
+The first `$` remains literal. A second `$` upgrades it only on a line containing
+indentation and that single dollar, with whitespace or nothing after the cursor.
+`tex` and `plaintex` use the standard `latex` parser alias unless an explicit
+language registration overrides it.
+
+| Before | Input | After |
+| --- | --- | --- |
+| `│` | `$` | `$│` |
+| `$│` | `$` | `$$│$$` |
+| `cost $│` | `$` | `cost $$│` |
+| `$$x│$$` | `$$` | `$$x$$│` |
+| `$$│$$` | `<BS>` | `│` |
+
+Enter in `$$│$$` creates `$$\n│\n$$`. The body and closing line use the
+opening line's indentation, including tabs. Existing body content keeps native
+Enter behavior. Parser-confirmed closing dollars skip one character at a time;
+body dollars and mismatched delimiters stay literal. Single-dollar inline math
+and `\(...\)`/`\[...\]` pairing are outside this rule.
+
+Comments, existing math, verbatim/listing/minted environments and inline
+`\verb` spans keep their original keys. `\lstinline` and `\mintinline` conservatively
+protect the rest of their line. Unfinished ordinary environments such as
+`document`, `center`, lists and figures can recover an opening boundary;
+unknown environments, unresolved earlier delimiters and recovery prefixes
+exceeding 256 direct syntax children pass through. Missing/pending parsers
+also preserve original input. No synchronous parse or buffer-wide text scan
+is requested.
+
+The implicit closer is `"$$"`. Independent `open`, `skip`, `delete` and `newline`
+flags default to `true`; `false` disables the rule. Global/filetype/buffer
+precedence, native undo/redo/dot and completion-owned Enter composition are the
+same as the other opt-in rules.
+
 ## Mappings and completion
 
 Setup preserves existing global mappings and leaves buffer mappings alone.
@@ -357,7 +403,7 @@ for the `<Ignore>` pattern used by this plugin's mappings.
 ./tests/run.sh
 stylua --check lua tests plugin
 
-# Also exercise actual Python/Rust/JavaScript/TypeScript/TSX grammars:
+# Also exercise actual Python/Rust/JavaScript/TypeScript/TSX/LaTeX grammars:
 ./tests/install-parsers.sh /tmp/pairs-parsers
 PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers ./tests/run.sh
 ```
@@ -367,7 +413,7 @@ They cover quotes, nesting, UTF-8 neighbors, backspace, Enter/indentation,
 undo/redo, dot repeat,
 configuration precedence, Python triple quotes and prefixes, JavaScript/TypeScript
 templates, tagged/nested templates and interpolation, Markdown fence boundaries
-and code-language injections,
+and code-language injections, LaTeX display dollars and verbatim/math boundaries,
 Tree-sitter literal/interpolation boundaries and
 pending parses, completion/snippet-style buffer edits, macro/paste behavior,
 and mapping lifecycle. CI checks the minimum

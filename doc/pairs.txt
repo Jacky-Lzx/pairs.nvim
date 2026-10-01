@@ -23,7 +23,7 @@ Options:
   treesitter           use installed parsers for syntax context, default false
   disabled_filetypes   list of disabled filetypes
   pairs                table keyed by opening delimiter; false disables a rule
-  multi_pairs          opt-in triples, template interpolation, fences; default {}
+  multi_pairs          opt-in triples, templates, fences, LaTeX $$; default {}
   filetypes            filetype -> { pairs, multi_pairs, enabled } overrides
 
 Rules contain close (single ASCII character), open, skip, delete, and newline
@@ -157,6 +157,41 @@ Missing/pending parser context preserves original keys.
 
 For a completion-owned Enter, use the usual accept -> expr('<CR>') -> fallback
 chain. Language completion is accepted first; a subsequent Enter expands.
+
+LATEX DISPLAY DOLLARS                                    *pairs-tex*
+
+Enable with treesitter=true and an installed latex parser: >lua
+    require('pairs').setup({
+      treesitter = true,
+      filetypes = {
+        tex = { multi_pairs = { ['$$'] = {} } },
+        plaintex = { multi_pairs = { ['$$'] = {} } },
+      },
+    })
+<
+The first $ stays literal. The second upgrades $| to $$|$$ only when that
+line contains indentation and one dollar, with whitespace or nothing after
+the cursor. | denotes the insertion cursor. tex/plaintex use the latex alias
+unless an explicit language registration overrides it.
+
+Parser-confirmed closing $$ skips one dollar at a time. <BS> deletes an
+adjacent empty $$ pair. <CR> expands it into three lines; the body and closer
+use the opening indentation, including tabs. Nonempty displays keep native
+Enter. Body dollars and mismatched closers stay literal. Inline single-dollar
+math and backslash parentheses/brackets are outside this rule.
+
+Comments, existing math and verbatim/listing/minted environments stay literal.
+Inline \verb spans (including unfinished spans) are protected. \lstinline and
+\mintinline conservatively protect their remaining line. Opening recovery in
+unfinished document/center/list/figure and other known text environments is
+bounded to 256 direct syntax children. Unknown environments, unresolved earlier
+delimiters and missing/pending parser context keep original input. No full
+synchronous parse or buffer-wide text scan is requested.
+
+close defaults to '$$'. open/skip/delete/newline default to true and are
+independent. false disables the rule. Overrides follow global multi_pairs,
+filetype, then b:pairs_multi_rules. Native undo/redo/dot are preserved. For a
+completion-owned Enter, use accept -> expr('<CR>') -> fallback as usual.
 
 ENTER                                                    *pairs-enter*
 

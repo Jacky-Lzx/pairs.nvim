@@ -279,12 +279,17 @@ local function code_prefix(root, text, row, col, start)
 end
 
 function M.capture(buf, row, col, text)
-  -- React filetypes are not registered as aliases in a bare Neovim runtime.
+  -- These filetypes are not registered as aliases in a bare Neovim runtime.
   -- Respect an explicit language registration before using standard aliases.
   local ft = vim.bo[buf].filetype
   local lang = vim.treesitter.language.get_lang(ft)
   if lang == ft then
-    lang = ({ javascriptreact = "javascript", typescriptreact = "tsx" })[ft] or lang
+    lang = ({
+      javascriptreact = "javascript",
+      typescriptreact = "tsx",
+      tex = "latex",
+      plaintex = "latex",
+    })[ft] or lang
   end
   local ok, parser = pcall(vim.treesitter.get_parser, buf, lang)
   if not ok or not parser then
@@ -304,8 +309,16 @@ function M.capture(buf, row, col, text)
     return { syntax = "unknown" }
   end
   local fence = parser:lang() == "markdown" and markdown_fence(buf, parser, range) or nil
-  local function with_fence(context)
+  local tex
+  if parser:lang() == "latex" then
+    local outer = parser:tree_for_range(range)
+    if outer then
+      tex = require("pairs.tex_syntax").capture(outer:root(), row, col, text, buf)
+    end
+  end
+  local function with_context(context)
     context.fence = fence
+    context.tex = tex
     return context
   end
   -- Tagged templates can inject HTML/SQL/etc. Those trees do not contain the
@@ -313,7 +326,7 @@ function M.capture(buf, row, col, text)
   local language = template_languages[parser:lang()] and parser or parser:language_for_range(range)
   local tree = language:tree_for_range(range)
   if not tree then
-    return with_fence({ syntax = "unknown" })
+    return with_context({ syntax = "unknown" })
   end
   local root = tree:root()
   local node = root:named_descendant_for_range(row, left, row, left)
@@ -338,9 +351,9 @@ function M.capture(buf, row, col, text)
       )
     if inside then
       if kind:find("comment", 1, true) then
-        return with_fence({ syntax = "comment" })
+        return with_context({ syntax = "comment" })
       elseif string_node(kind) then
-        return with_fence(string_context(buf, node))
+        return with_context(string_context(buf, node))
       elseif
         kind == "template_substitution"
         or kind == "interpolation"
@@ -365,19 +378,19 @@ function M.capture(buf, row, col, text)
           if suffix then
             local fr, fc = suffix:range()
             if before(fr, fc, row, col) then
-              return with_fence({ syntax = "string", literal_string = true })
+              return with_context({ syntax = "string", literal_string = true })
             end
           end
         end
         break
       elseif kind == "format_specifier" or kind == "type_conversion" then
-        return with_fence({ syntax = "string", literal_string = true })
+        return with_context({ syntax = "string", literal_string = true })
       end
     end
     node = node:parent()
   end
   local masked, reason = code_prefix(root, text, row, col, start)
-  return with_fence(masked and {
+  return with_context(masked and {
     syntax = "code",
     lex_line = masked,
     previous_string = previous_string,

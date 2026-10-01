@@ -169,14 +169,36 @@ completion, LuaSnip, native undo/redo/dot, and existing closer reuse.
 Default/minimal/Python startup smoke, help tags, health, formatting and diff
 checks pass. External LSP responses remain separate acceptance work.
 
+## LaTeX display-dollar milestone (implemented)
+
+- Opt-in `multi_pairs['$$']` for tex/plaintex using the outer LaTeX grammar.
+- Keep the first dollar literal; upgrade the second only at a standalone display
+  line. Inline single-dollar and backslash math delimiters remain outside scope.
+- Skip parser-confirmed closing dollars individually; delete adjacent empty
+  displays and expand them on Enter with the opening line's indentation.
+- Protect comments, math, raw environments and inline verb/code commands.
+  Recover incomplete known text environments, including full documents, with
+  bounded direct-child inspection; unknown/error contexts preserve input.
+- Retain time-sliced parsing, action flags, overrides, mapping ownership and
+  native undo/redo/dot. Standard tex/plaintex aliases respect custom registrations.
+- Build a pinned LaTeX grammar from its official generated-C npm release and
+  enable both filetype rules in the user's local configuration.
+
+Validation: 876 cumulative tests pass on Neovim 0.11.0 and 0.12.5; 475 pass
+without optional parser fixtures. The actual configuration passes 152 input
+cases with installed VimTeX, blink.cmp confirmation, LuaSnip placeholders and
+native undo/redo/dot. Default/minimal/Python startup smoke, help tags, health,
+formatting and diff checks pass. External LSP responses remain separate
+acceptance work.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
    regression case before refining heuristics.
 2. Extend completion/snippet acceptance to more languages and real LSP sources,
    including auto-insert previews and semantic bracket resolution.
-3. Add opt-in LaTeX rules. Evaluate ambiguous angle brackets with explicit
-   context and priority.
+3. Extend LaTeX rules to backslash math delimiters based on concrete input
+   examples. Evaluate ambiguous angle brackets with explicit context and priority.
 4. Measure real typing latency before considering caching or incremental scans.
 5. Expand beyond Insert mode only after its behavior has settled.
 

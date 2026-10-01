@@ -1045,6 +1045,15 @@ dofile("tests/long_fences.lua")({
   plugin = plugin,
 })
 
+dofile("tests/tex.lua")({
+  test = test,
+  input = input,
+  seed = seed,
+  feed = feed,
+  eq = eq,
+  plugin = plugin,
+})
+
 plugin.teardown()
 if #failures > 0 then
   io.stderr:write(table.concat(failures, "\n\n") .. "\n")
