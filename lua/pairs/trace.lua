@@ -109,6 +109,7 @@ function M.record(key, result, ctx, config)
     "move",
     "indent_offset",
     "insert_close",
+    "remove_close",
     "prefix",
     "error",
     "trim_space",

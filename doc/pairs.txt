@@ -332,7 +332,9 @@ before the owner's native fallback. See the blink.cmp example in README.md.
 
 FAST WRAP                                                *pairs-fast-wrap*
 
-Moves an adjacent empty bracket's closer around the next same-line identifier:
+Wraps the next same-line identifier after a standard opening bracket:
+  (|value        -> (value)|   insert a missing closer
+  (|value)       -> (value)|   reuse an immediately following closer
   (|)value       -> (value)|
   [|]item_2      -> [item_2]|
   fn((|)value, x) -> fn((value)|, x)
@@ -352,13 +354,17 @@ edit the buffer when called. Compose it in an expression mapping using
 replace_keycodes=false. Account for queued text with the <Ignore>/private
 expression pattern described in |map-expression|.
 
-The cursor must be inside adjacent empty (), [] or {}, with the target directly
-after its closer. Typing only ( before existing text keeps the existing opening
-policy; it does not create this precondition. Targets match ASCII identifiers
+Type ( before existing text, then invoke fast wrap to supply its missing closer.
+The existing normal opening policy is unchanged. The cursor must immediately
+follow (, [ or {, with the target after the cursor or an adjacent closer.
+Targets match ASCII identifiers
 [A-Za-z_][A-Za-z0-9_]*. Unicode identifiers, leading whitespace, padded pairs,
 quotes, calls/member access/indexing and immediately adjoining operators do not
 wrap. End of line, whitespace, commas, semicolons and standard closing brackets
 terminate a target. Following text stays unchanged; only one identifier wraps.
+A matching closer must immediately follow the target to be reused. Spaces and
+other suffix text are preserved. Reuse follows current bracket nesting; other
+unclosed outer brackets are not repaired.
 
 wrap defaults to true for standard brackets, false for other rules. Disable it
 globally/per-filetype/in b:pairs_rules. It is independent of open/skip/delete/
@@ -369,10 +375,11 @@ the existing line-local lexer fallback.
 Changing a standard closer to a custom one disables inherited wrapping, keeping
 existing custom rules valid. Explicit wrap=true requires a standard pair.
 
-Native deletion/movement/insertion retains undo/redo/dot. Dot replays the
+Native movement and any required deletion/insertion retain undo/redo/dot. Dot replays the
 recorded movement length, without choosing a new identifier. Inspect with
 :PairsInspect <FastWrap>. Traces record logical key <FastWrap>, wrap policy and
-target length. Reproduce exports via fast_wrap() or expr('<FastWrap>');
+target length, remove_close and insert_close flags (including false values).
+Reproduce exports via fast_wrap() or expr('<FastWrap>');
 <FastWrap> is an API action name, not a physical key.
 
 SPACE PADDING                                            *pairs-space*

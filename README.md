@@ -559,11 +559,15 @@ for the `<Ignore>` pattern used by this plugin's mappings.
 
 ## Fast wrap
 
-Fast wrap moves the closer of an adjacent empty `()`, `[]` or `{}` around the
-next same-line ASCII identifier. It leaves the cursor after the moved closer:
+Fast wrap encloses the next same-line ASCII identifier after an opening `(`,
+`[` or `{`, leaving the cursor after its closer. It inserts a missing closer,
+reuses one immediately after the identifier, or moves an adjacent empty pair's
+closer around the identifier:
 
 | Before | Action | After |
 | --- | --- | --- |
+| `(│value` | fast wrap | `(value)│` |
+| `(│value)` | fast wrap | `(value)│` |
 | `(│)value` | fast wrap | `(value)│` |
 | `[│]item_2` | fast wrap | `[item_2]│` |
 | `fn((│)value, next)` | fast wrap | `fn((value)│, next)` |
@@ -586,14 +590,18 @@ fallback. Returned keycodes require `replace_keycodes = false`. Account for
 queued typed text using the same `<Ignore>`/private expression mapping pattern
 as the plugin's owned shortcut.
 
-The cursor must be between adjacent empty brackets, with the identifier directly
-after the closer. Typing only `(` before an existing word retains the existing
-opening policy and does not create that precondition. Identifiers match
+Type `(` at `│value`, then invoke the shortcut to produce `(value)│`. The normal
+opening policy remains the same; fast wrap explicitly supplies the missing
+closer. The cursor must be immediately after the opening bracket, with the
+identifier directly after the cursor or an adjacent closer. Identifiers match
 `[A-Za-z_][A-Za-z0-9_]*`; Unicode identifiers, leading whitespace, padding,
 quotes, calls, member access, indexing and immediately adjoining operators are
 outside this version's target support. End of line, whitespace, commas,
 semicolons and standard closing brackets terminate a target; any following text
 is preserved. Only the first identifier is wrapped, never a full expression.
+An existing matching closer must immediately follow the identifier to be reused;
+spaces and other suffix text are preserved. Reuse follows the current bracket
+nesting and does not repair other unclosed outer brackets.
 
 The single-character `wrap` flag defaults to true for standard brackets and
 false for other rules. Disable it per rule, filetype or live `b:pairs_rules`.
@@ -605,10 +613,11 @@ structural interpolation delimiters do not wrap. The complete same-line prefix
 and identifier share `max_scan_bytes`, with one boundary-lookahead byte.
 Missing parsers retain the existing line-local lexer fallback.
 
-Native deletion/movement/insertion preserves undo/redo and dot repeat; dot
+Native movement and any required deletion/insertion preserve undo/redo and dot repeat; dot
 replays the recorded movement length rather than selecting a new target.
 `:PairsInspect <FastWrap>` previews the decision without editing. Actual calls
-are traced with the logical key `<FastWrap>`, the `wrap` policy and target length.
+are traced with the logical key `<FastWrap>`, the `wrap` policy, target length,
+and `remove_close`/`insert_close` flags, including false flags for pure reuse.
 Reproduce an exported wrap through `fast_wrap()` or `expr("<FastWrap>")`;
 `<FastWrap>` is an API action name, not a physical key. `handle("<FastWrap>")`
 returns an empty string on fallback.

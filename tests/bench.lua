@@ -192,6 +192,20 @@ local cases = {
   { name = "closer-skip", line = "()", col = 1, key = ")", action = "skip" },
   { name = "fast-wrap-identifier", line = "()value", col = 1, key = "<FastWrap>", action = "wrap" },
   {
+    name = "fast-wrap-missing-closer",
+    line = "(value",
+    col = 1,
+    key = "<FastWrap>",
+    action = "wrap",
+  },
+  {
+    name = "fast-wrap-reuse-closer",
+    line = "(value)",
+    col = 1,
+    key = "<FastWrap>",
+    action = "wrap",
+  },
+  {
     name = "padded-closer-skip",
     line = "( value )",
     col = 7,
@@ -450,6 +464,22 @@ mapped("mapped-enter", "{<CR>x", { "{", "  x", "}" }, false, 2)
 mapped(
   "mapped-fast-wrap",
   "()value" .. string.rep("<C-g>U<Left>", 6) .. "<F8>x",
+  { "(value)x" },
+  false,
+  3,
+  { mappings = { fast_wrap = "<F8>" } }
+)
+mapped(
+  "mapped-opener-wrap",
+  "value" .. string.rep("<C-g>U<Left>", 5) .. "(<F8>x",
+  { "(value)x" },
+  false,
+  2,
+  { mappings = { fast_wrap = "<F8>" } }
+)
+mapped(
+  "mapped-opener-reuse",
+  "value)" .. string.rep("<C-g>U<Left>", 6) .. "(<F8>x",
   { "(value)x" },
   false,
   3,

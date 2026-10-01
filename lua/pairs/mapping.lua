@@ -97,7 +97,9 @@ end
 
 function M.render(result)
   if result.action == "wrap" then
-    return keycode("<Del>") .. string.rep(keycode("<C-g>U<Right>"), result.move) .. result.close
+    return (result.remove_close and keycode("<Del>") or "")
+      .. string.rep(keycode("<C-g>U<Right>"), result.move)
+      .. (result.insert_close and result.close or keycode("<C-g>U<Right>"))
   elseif result.action == "pair" then
     return result.open .. result.close .. string.rep(keycode("<C-g>U<Left>"), #result.close)
   elseif result.action == "skip" then

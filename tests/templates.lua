@@ -86,7 +86,16 @@ return function(h)
     case("before text interpolation stays literal", "`$│word`", "{", "`${│word`")
     case("existing brace is not duplicated", "`$│}`", "{", "`${│}`")
     case("body brace is not skipped", "`a │} b`", "}", "`a }│} b`")
-    case("after complete template", "`body` + │", "`", "`body` + `│`")
+    test("template " .. ft .. ": after complete template", function()
+      local entry = seed("`body` + │", ft)
+      plugin.setup(opts)
+      local lang = ({ javascriptreact = "javascript", typescriptreact = "tsx" })[ft] or ft
+      -- Prepare this parser-ready boundary fixture; pending parsing is tested
+      -- separately below and must retain ordinary input when a slice yields.
+      vim.treesitter.get_parser(0, lang):parse(true)
+      feed(entry .. "`<Cmd>lua pairs_test_capture()<CR><Esc>")
+      eq(_G.pairs_test_result, "`body` + `│`")
+    end)
     case(
       "opening disabled",
       "│",

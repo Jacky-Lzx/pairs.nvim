@@ -416,6 +416,40 @@ cases; parser-free smoke passes 15 decisions and the same eight mapped cases.
 Default/minimal/Python startup, executable README/help examples on both versions,
 help tags, health, formatting and diff checks pass.
 
+## Fast wrap after a typed opening bracket milestone (implemented)
+
+- Extend the existing fast_wrap API/shortcut to an identifier immediately after
+  a standard opener. Insert its missing closer or reuse a matching closer
+  immediately after the identifier. Preserve adjacent-empty-pair movement and
+  the existing wrap policy, syntax protection, single bounded prefix scan and
+  identifier/boundary budget. No new mapping or option is required.
+- Render each case with native protected movement and only the necessary
+  deletion/insertion. Pure reuse preserves both changedtick and undo history.
+  Retain typed-opener undo/redo/dot and suffix text; do not infer the historical
+  ownership of a closer or repair other unclosed outer brackets.
+- Export explicit remove_close/insert_close flags, including false values,
+  together with mode-specific reasons. Confirm local export replay in all three
+  modes. Keep complex/Unicode targets, whitespace before a target and unsafe
+  interpolation/parser contexts outside support.
+- Prepare the completed-template parser-ready regression fixture before its
+  assertion. Pending-parser tests remain separate and retain asynchronous
+  native-input behavior; runtime parsing is unchanged.
+
+Validation: 1497 cumulative real-input tests pass on Neovim 0.11.0 and 0.12.5
+with pinned parser fixtures; 697 pass without fixtures. The 46 new cases cover
+standard shapes, natural typed-opener workflows, nesting, insertion/reuse
+policies, pure-movement invariants, undo/redo/dot, bounded scans, native fallback,
+API composition, trace flag/export replay and syntax/pending protection.
+The actual local configuration passes 274 input cases with real blink.cmp and
+LuaSnip, including opener insertion and pure reuse in active snippet workflows,
+subsequent navigation and undo/redo/dot. Options are changed only during
+acceptance and then restored; all 172 tracked configuration files retain their
+original bytes. External LSP startup remains stubbed.
+Stable/minimum-version benchmarks pass 26 decisions and ten mapped cases;
+parser-free smoke passes 17 decisions and the same ten mapped cases. Startup
+profiles, executable README/help examples on both versions, help tags, health,
+formatting and diff checks pass.
+
 ## Subsequent milestones
 
 1. Collect concrete mispair examples from daily use and turn each into a
