@@ -1,0 +1,76 @@
+*pairs.nvim*  Conservative quote and bracket pairing for Neovim
+
+Requires Neovim 0.11+. Pure Lua, no runtime dependencies.
+
+SETUP                                                    *pairs-setup*
+
+Disable other auto-pairs plugins, then: >lua
+    require('pairs').setup({
+      pairs = { ["'"] = { open = false } },
+      treesitter = false,
+    })
+<
+Handles Insert-mode (), [], {}, double and single quotes, matching closer
+skipping, and empty-pair <BS>. <CR>/<Tab> and other modes are not mapped.
+
+Options:
+  enabled              boolean or function(bufnr), default true
+  mappings.enabled     install mappings, default true
+  mappings.bs          install <BS> mapping, default true
+  max_scan_bytes       maximum line prefix to scan, default 4096
+  treesitter           consult valid existing trees, default false
+  disabled_filetypes   list of disabled filetypes
+  pairs                table keyed by opening delimiter; false disables a rule
+  filetypes            filetype -> { pairs = overrides, enabled = boolean }
+
+Rules contain close (single ASCII character), open, skip, delete (booleans).
+Actions default to true for new rules. Overrides are merged with defaults.
+Closing delimiters must be unique. Multi-character delimiters are unsupported.
+Single-quote opening defaults to false in text, markdown, and rust.
+
+Buffer overrides use b:pairs_enabled and b:pairs_rules. Buffer rules override
+global and filetype rules; newly introduced delimiters need explicit mappings.
+
+API                                                      *pairs-api*
+
+setup(opts)            Validate config and install non-conflicting mappings.
+expr(key)              Return handled keycodes, or nil for caller fallback.
+handle(key)            Return handled or original keycodes.
+explain(key, opts)     Return action/reason without editing; Insert mode by
+                      default. opts.assume_insert previews insertion before
+                      the Normal-mode cursor.
+enable([bufnr])        Enable globally, or enable one buffer.
+disable([bufnr])       Disable globally, or disable one buffer.
+toggle([bufnr])        Toggle globally, or toggle one buffer.
+status()              Initialization, global enabled state, mapping conflicts.
+teardown()            Remove only mappings still owned by this plugin.
+
+Use key notation such as '<BS>'. expr()/handle() return termcodes; mappings
+should use { expr = true, replace_keycodes = false }.
+
+COMMANDS                                                 *pairs-commands*
+
+:PairsToggle           Toggle pairing globally.
+:PairsInspect {key}    Preview insertion before the cursor; does not edit text.
+:checkhealth pairs     Inspect initialization and setup-time mapping conflicts.
+
+LIMITS                                                   *pairs-limits*
+
+The fallback lexer is line-local. It recognizes common line comments and basic
+quoted strings, not complete language grammars. Escaping uses backslash parity;
+non-ASCII neighbors conservatively block quote opening. Malformed bracket
+prefixes and scans exceeding max_scan_bytes pass through.
+
+treesitter=true consults valid existing trees without a synchronous full parse.
+Missing parsers use the fallback lexer; stale/unparsed trees pass through until
+refreshed. Enable your usual highlighter or explicitly parse the buffer first.
+Raw/multiline literal contents pass through without quote skipping/deletion.
+
+Existing global mappings are preserved; buffer mappings take precedence.
+Paste, macro recording/replay, Replace mode, and special buffers bypass pairing.
+Runtime context errors pass through and are exposed by explain().
+
+Enter expansion, multi-character pairs, wrapping and command-line mode are
+planned. See README.md and docs/PLAN.md in the checkout for details.
+
+ vim:tw=78:ts=8:ft=help:norl:
