@@ -22,10 +22,14 @@ return function(h)
     plugin.setup(opts)
     eq(opts, original)
     local config = require("pairs.config")
-    eq(
-      config.resolve_multi(config.build(opts), "tex")["$$"],
-      { close = "$$", open = true, skip = true, delete = true, newline = true }
-    )
+    eq(config.resolve_multi(config.build(opts), "tex")["$$"], {
+      close = "$$",
+      open = true,
+      skip = true,
+      delete = true,
+      newline = true,
+      space = false,
+    })
     eq(vim.fn.maparg("$", "i", false, true).desc, "pairs.nvim $")
   end)
   test("tex: invalid closer rejected", function()

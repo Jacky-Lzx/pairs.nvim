@@ -155,6 +155,14 @@ function M.decide(ctx, key)
     end
   end
   local rules = ctx.multi_rules or {}
+  local pair = ctx.tex and ctx.tex.pair
+  local rule = pair and rules[pair.open]
+  if rule and rule ~= false and rule.space and not ctx.tex.blocked then
+    local padding = require("pairs.padding").multi(ctx, key, rule, pair, 0)
+    if padding then
+      return padding
+    end
+  end
   local dollar = rules["$$"]
   local action = dollar and dollar ~= false and dollars(ctx, key, dollar) or nil
   return action or slash_math(ctx, key, rules)

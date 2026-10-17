@@ -20,7 +20,14 @@ return function(h)
     eq(opts, before)
     local resolved =
       require("pairs.config").resolve_multi(require("pairs.config").build(opts), "markdown")
-    eq(resolved["```"], { close = "```", open = true, newline = true, skip = true, delete = false })
+    eq(resolved["```"], {
+      close = "```",
+      open = true,
+      newline = true,
+      skip = true,
+      delete = false,
+      space = false,
+    })
     eq(vim.fn.maparg("`", "i", false, true).desc, "pairs.nvim `")
   end)
   test("fence: invalid closer is rejected", function()

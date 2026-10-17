@@ -24,8 +24,22 @@ return function(h)
     eq(opts, original)
     local config = require("pairs.config")
     local rules = config.resolve_multi(config.build(opts), "tex")
-    eq(rules["\\("], { close = "\\)", open = true, skip = true, delete = true, newline = false })
-    eq(rules["\\["], { close = "\\]", open = true, skip = true, delete = true, newline = true })
+    eq(rules["\\("], {
+      close = "\\)",
+      open = true,
+      skip = true,
+      delete = true,
+      newline = false,
+      space = false,
+    })
+    eq(rules["\\["], {
+      close = "\\]",
+      open = true,
+      skip = true,
+      delete = true,
+      newline = true,
+      space = false,
+    })
     eq(vim.fn.maparg("\\", "i", false, true).desc, "pairs.nvim \\")
     eq(vim.fn.maparg("<Tab>", "i"), "")
   end)

@@ -134,13 +134,16 @@ local function validate_multi(rules)
         type(rule) == "table" and rule.close == close,
         "pairs: multi-character closer does not match its rule"
       )
-      for _, key in ipairs({ "open", "skip", "delete", "newline" }) do
+      for _, key in ipairs({ "open", "skip", "delete", "newline", "space" }) do
         if rule[key] == nil then
-          rule[key] = not (fence and key == "delete") and not (open == "\\(" and key == "newline")
+          rule[key] = key ~= "space"
+            and not (fence and key == "delete")
+            and not (open == "\\(" and key == "newline")
         end
         assert(type(rule[key]) == "boolean", "pairs: multi rule." .. key .. " must be boolean")
       end
       assert(not fence or not rule.delete, "pairs: Markdown fence deletion is not supported")
+      assert(not fence or not rule.space, "pairs: Markdown fence space padding is not supported")
     end
   end
 end

@@ -96,6 +96,17 @@ requires exactly one ASCII space on each side. Enter trims this padding before
 expanding. Set `skip_space = true` separately to make `( value│ )` + `)` move to
 `( value )│`. Both options default to false.
 
+For multi-character pairs, enable `space` on the individual rule:
+
+```lua
+multi_pairs = { ["\\("] = { space = true } }
+```
+
+This supports Python triple quotes, `${…}` and LaTeX `$$`, `\(…\)`, `\[…\]`,
+with `treesitter = true` and an installed parser. Space, Backspace and Enter
+follow the same padding rules, retaining each family's Enter behavior.
+`space` defaults to false and is unsupported for Markdown fences.
+
 ### Fast wrap
 
 With `mappings.fast_wrap = "<M-e>"`, invoke the shortcut immediately after an

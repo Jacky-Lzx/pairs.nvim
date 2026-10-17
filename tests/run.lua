@@ -1116,6 +1116,15 @@ dofile("tests/space.lua")({
   plugin = plugin,
 })
 
+dofile("tests/multi_space.lua")({
+  test = test,
+  input = input,
+  seed = seed,
+  feed = feed,
+  eq = eq,
+  plugin = plugin,
+})
+
 dofile("tests/space_skip.lua")({
   test = test,
   input = input,

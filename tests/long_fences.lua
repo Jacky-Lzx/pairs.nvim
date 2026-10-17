@@ -21,10 +21,14 @@ return function(h)
     local config = require("pairs.config")
     local rules = config.resolve_multi(config.build(opts), "markdown")
     for _, family in ipairs({ "```", "~~~" }) do
-      eq(
-        rules[family],
-        { close = family, open = true, newline = true, skip = true, delete = false }
-      )
+      eq(rules[family], {
+        close = family,
+        open = true,
+        newline = true,
+        skip = true,
+        delete = false,
+        space = false,
+      })
       eq(vim.fn.maparg(family:sub(1, 1), "i", false, true).desc, "pairs.nvim " .. family:sub(1, 1))
     end
   end)

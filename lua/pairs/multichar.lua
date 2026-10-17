@@ -29,6 +29,19 @@ function M.decide(ctx, key)
   local delimiter = ctx.literal_delimiter
   local rule = delimiter and ctx.multi_rules[delimiter]
   if ctx.syntax == "string" and rule and rule ~= false then
+    if rule.space then
+      local padding = require("pairs.padding").multi(ctx, key, rule, {
+        open = delimiter,
+        close = delimiter,
+        open_row = ctx.literal_start_row,
+        open_col = ctx.literal_open_col,
+        close_row = ctx.literal_close_row,
+        close_col = ctx.literal_close_col,
+      }, 0)
+      if padding then
+        return padding
+      end
+    end
     local closing = ctx.literal_close_col
     local at_close = closing ~= nil and ctx.row == ctx.literal_close_row
     if

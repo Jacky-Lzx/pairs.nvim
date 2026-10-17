@@ -94,6 +94,15 @@ space before the closer. It works independently of space. Both options default
 to false. Space/paired BS apply only to empty brackets; tabs, strings and
 comments use ordinary input.
 
+Multi-character rules use the same space=true option: >lua
+    multi_pairs = { ['\\('] = { space = true } }
+<
+Supports Python triples, ${...} and LaTeX $$, \(...\), \[...\]; requires
+treesitter=true and an installed parser. Same-line empty pairs gain one space
+on each side; BS removes exactly that padding. Enter trims it only if the
+rule's newline is enabled, preserving the family's indentation. Defaults to
+false. Markdown fences do not support space=true.
+
 ==============================================================================
 FAST WRAP                                                *pairs-fast-wrap*
 

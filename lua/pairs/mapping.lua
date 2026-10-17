@@ -46,6 +46,9 @@ function M.attach(config, handler, fast_wrap)
     for open, rule in pairs(rules) do
       if rule ~= false then
         keys[open:sub(-1)], keys[rule.close:sub(-1)] = true, true
+        if rule.space and config.mappings.space then
+          keys[" "] = true
+        end
         if open == "\\(" or open == "\\[" then
           keys["\\"] = true -- Skip the first character of a proven TeX closer.
         end

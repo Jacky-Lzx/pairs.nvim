@@ -58,6 +58,19 @@ function M.decide(ctx, key)
   end
   local sub = ctx.substitution
   if interpolation and interpolation ~= false and sub then
+    if interpolation.space then
+      local padding = require("pairs.padding").multi(ctx, key, interpolation, {
+        open = "${",
+        close = "}",
+        open_row = sub.body_row,
+        open_col = sub.body_col - 2,
+        close_row = sub.close_row,
+        close_col = sub.close_col,
+      })
+      if padding then
+        return padding
+      end
+    end
     local closing = ctx.row == sub.close_row and ctx.col == sub.close_col
     if key == "}" and interpolation.skip and closing then
       return result("skip", "interpolation_closer", "${", "}")
