@@ -2,408 +2,73 @@
 
 Requires Neovim 0.11+. Pure Lua, no runtime dependencies.
 
+  |pairs-setup|       Configuration and defaults
+  |pairs-space|       Symmetric space padding
+  |pairs-fast-wrap|   Wrap an identifier, member chain or call
+  |pairs-triples|     Python triple quotes
+  |pairs-templates|   JavaScript/TypeScript templates
+  |pairs-fences|      Markdown code fences
+  |pairs-tex|         LaTeX math and context
+  |pairs-enter|       Enter and completion integration
+  |pairs-api|         Lua API
+  |pairs-commands|    Commands and diagnostics
+  |pairs-limits|      Syntax and mapping limits
+
+==============================================================================
 SETUP                                                    *pairs-setup*
 
-Disable other auto-pairs plugins, then: >lua
+Disable other auto-pairs plugins, then call setup (require alone does not
+install mappings): >lua
     require('pairs').setup({
-      pairs = { ["'"] = { open = false } },
-      treesitter = false,
+      treesitter = true, -- optional; requires installed parsers
+      pairs = { ['('] = { space = true } },
     })
 <
-Handles Insert-mode (), [], {}, double and single quotes, matching closer
-skipping, empty-pair <BS>, and empty-bracket expansion on <CR>.
-<Tab> and other modes are not mapped.
+Defaults pair (), [], {}, double and single quotes. Matching closers are
+skipped; <BS> removes adjacent empty pairs; <CR> expands empty brackets.
+Quotes next to words/non-ASCII text open conservatively. Single-quote opening
+is disabled in text, markdown and rust. Tab is never mapped.
 
-Options:
+Options (only overrides are needed):
   enabled              boolean or function(bufnr), default true
-  mappings.enabled     install mappings, default true
-  mappings.bs          install <BS> mapping, default true
-  mappings.cr          install <CR> mapping, default true
+  mappings.enabled     install non-conflicting mappings, default true
+  mappings.bs          install <BS>, default true
+  mappings.cr          install <CR>, default true; see |pairs-enter|
   mappings.space       allow opt-in Space mapping, default true
-  mappings.fast_wrap   optional single non-text shortcut, default false
-  max_scan_bytes       maximum line prefix to scan, default 4096
-  treesitter           use installed parsers for syntax context, default false
-  disabled_filetypes   list of disabled filetypes
-  pairs                table keyed by opening delimiter; false disables a rule
-  multi_pairs          opt-in triples, templates, fences, LaTeX math; default {}
+  mappings.fast_wrap   shortcut such as '<M-e>' or '<F8>', default false
+  max_scan_bytes       scan budget in bytes, default 4096
+  treesitter           use installed parsers, default false
+  disabled_filetypes   default { 'TelescopePrompt', 'snacks_picker_input' }
+  pairs                single-character rules; false disables a rule
+  multi_pairs          opt-in language rules, default {}
   tex_environments     TeX environment name -> text/math/literal/false
   filetypes            filetype -> rule/environment/enabled overrides
 
-Rules contain close (single ASCII character), open, skip, delete, and newline
-(booleans), plus space and skip_space (booleans, default false;
-(), [] and {} only), and wrap (true for (), [] and {}; false otherwise).
-Open/skip/delete default to true for new rules. Newline defaults
-to true for asymmetric pairs; symmetric quotes never expand. Overrides merge
-with defaults.
-Closing delimiters must be unique. Multi-character rules use multi_pairs.
-Single-quote opening defaults to false in text, markdown, and rust.
-Re-enabling a single-character rule disabled with false requires its close value.
+Single-character rules:
+  close       printable ASCII closer; required for a new rule
+  open        insert a pair, default true
+  skip        skip a proven matching closer, default true
+  delete      remove adjacent empty pairs, default true
+  newline     expand on Enter, default true for asymmetric pairs
+  space       symmetric padding, default false; standard brackets only
+  skip_space  skip one space before a closer, default false; standard only
+  wrap        permit fast wrap, default true for standard brackets only
 
-Buffer overrides use b:pairs_enabled and b:pairs_rules. Buffer rules override
-global and filetype rules; newly introduced delimiters need explicit mappings.
-Validated single/multi rule metadata from setup is reused across keys. Buffer
-overrides are still read, merged and validated on every capture; changing them
-does not require another setup. Filetype switches and re-setup select new rules.
-
-PYTHON TRIPLE QUOTES                                      *pairs-triples*
-
-Opt-in, with treesitter=true and an installed Python parser: >lua
-    require('pairs').setup({
-      treesitter = true,
-      filetypes = {
-        python = {
-          multi_pairs = {
-            [string.rep('"', 3)] = {},
-            [string.rep("'", 3)] = {},
-          },
-        },
-      },
-    })
+Closing delimiters must be unique. Symmetric quotes never expand on Enter.
+Re-enabling a single-character rule disabled with false requires its close.
+Overrides merge: defaults -> global -> filetype -> live buffer options: >lua
+    vim.b.pairs_enabled = false
+    vim.b.pairs_rules = { ['"'] = { open = false } }
+    vim.b.pairs_multi_rules = { ['$$'] = false }
+    vim.b.pairs_tex_environments = { proof = 'text' }
 <
-Typing the third identical quote after a complete empty short string creates
-a triple pair. Python r/u/b/f/br/rb/fr/rf prefixes are supported in either case.
-At its real closing delimiter each quote press skips one quote. Body quotes
-pass through. <BS> removes an adjacent empty triple pair; <CR> creates a middle
-and closing line aligned with the opening line. Undo/redo and dot retain the
-complete insertion.
+New delimiter/Space mappings need a setup-time global/filetype declaration or
+an explicitly composed mapping. Buffer-only rules do not install mappings.
 
-Multi rules contain open, skip, delete, and newline, all defaulting to true.
-The closer must equal the opener and may be omitted. false disables a rule.
-Precedence is global multi_pairs, filetype multi_pairs, b:pairs_multi_rules.
-This rule family applies only to Python. Missing/pending parser context cannot
-trigger triple pairing; ordinary quote handling remains the fallback.
-
-JAVASCRIPT / TYPESCRIPT TEMPLATES                         *pairs-templates*
-
-Opt-in for javascript/javascriptreact/typescript/typescriptreact: >lua
-    local templates = {
-      pairs = { ['`'] = { close = '`' } },
-      multi_pairs = { ['${'] = {} },
-    }
-    require('pairs').setup({
-      treesitter = true,
-      filetypes = {
-        javascript = templates,
-        javascriptreact = templates,
-        typescript = templates,
-        typescriptreact = templates,
-      },
-    })
-<
-Install the relevant JavaScript/TypeScript/TSX parser. React filetype aliases
-are handled when no custom parser-language mapping is registered.
-
-Backticks pair, including after a tag, and skip the actual closing backtick
-on the same or another line. <BS> removes an adjacent empty template, keeping
-its tag. <CR> in template text remains an ordinary newline.
-The outer JS/TS grammar owns template boundaries even with language injections.
-
-In template text, { after an unescaped $ inserts {}. A following } is reused;
-opening before existing words is suppressed. Inside ${...}, normal code pairing
-applies. Nested templates, strings and object braces keep their own boundaries.
-The actual interpolation closer is skipped; ordinary template body characters,
-string/comment/regex/JSX text contexts remain protected.
-
-<BS> in an empty ${} removes all three characters; <CR> creates an indented
-middle and closing line. Backtick rules use standard open/skip/delete flags.
-multi_pairs['${'] defaults to close='}', with independent open/skip/delete/
-newline flags, all true. Overrides follow global/filetype/buffer precedence.
-Backtick, interpolation and ordinary brace rules work independently.
-Advanced template handling needs current parser context. Missing parsers use
-the line-local lexer; pending parses preserve original keys.
-
-MARKDOWN CODE FENCES                                      *pairs-fences*
-
-Opt-in, with treesitter=true and an installed Markdown parser: >lua
-    require('pairs').setup({
-      treesitter = true,
-      filetypes = {
-        markdown = { multi_pairs = { ['```'] = {}, ['~~~'] = {} } },
-      },
-    })
-<
-At the end of a new opening line with three or more backticks/tildes and an
-optional language/info string, <CR> adds a middle and closing line. The cursor remains
-on the middle line. The info string is retained; both lines use the opening
-line's indentation, which may contain zero to three spaces relative to a
-containing list/quote. The generated closer matches the opening character and
-exact length.
-
-Existing body content or a closing fence inserts one line, preserving the
-block. Within a container, that line receives the continuation prefix.
-At a confirmed closing delimiter, each delimiter character skips one position.
-An existing closer must use the same character and be at least as long as its
-opener. Shorter/different-character lines remain body content.
-The outer Markdown tree owns these boundaries even when the body has an
-injected code-language parser.
-
-Backtick and tilde openers work at the top level, in lists/block quotes and in
-nested combinations. List markers become continuation indentation; quote
-markers remain. For example, Enter after '> - ```lua' creates: >
-    > - ```lua
-    >   |
-    >   ```
-<
-The | represents the cursor. Prefix tabs become spaces at Markdown's four-column
-tab stops, independently of buffer tabstop/expandtab. Native comment leaders
-and indentexpr do not duplicate or change the generated prefix.
-
-Inline code, HTML, indented code relative to its container and task-marker text
-retain ordinary input. Inline backtick pairing is not
-enabled. Enter inside the info string or existing body stays native. See
-CommonMark 4.5, 5.1 and 5.2 for the syntax contract.
-Backtick-fence info may not contain backticks; tilde-fence info may contain them.
-
-multi_pairs['```'] and multi_pairs['~~~'] configure independent families for
-all opening lengths >= 3. Longer configuration keys are rejected. close defaults
-to the family key; generated closing text matches the actual opening length.
-open/newline/skip default to true. Expansion requires both open and newline.
-false disables that family. Overrides follow global,
-filetype, then b:pairs_multi_rules. Backspace stays ordinary; delete=true is
-unsupported and rejected. Undo/redo and dot retain the complete insertion.
-Missing/pending parser context preserves original keys.
-
-For a completion-owned Enter, use the usual accept -> expr('<CR>') -> fallback
-chain. Language completion is accepted first; a subsequent Enter expands.
-
-LATEX DISPLAY DOLLARS                                    *pairs-tex*
-
-Enable with treesitter=true and an installed latex parser: >lua
-    require('pairs').setup({
-      treesitter = true,
-      filetypes = {
-        tex = { multi_pairs = { ['$$'] = {} } },
-        plaintex = { multi_pairs = { ['$$'] = {} } },
-      },
-    })
-<
-The first $ stays literal. The second upgrades $| to $$|$$ only when that
-line contains indentation and one dollar, with whitespace or nothing after
-the cursor. | denotes the insertion cursor. tex/plaintex use the latex alias
-unless an explicit language registration overrides it.
-
-Parser-confirmed closing $$ skips one dollar at a time. <BS> deletes an
-adjacent empty $$ pair. <CR> expands it into three lines; the body and closer
-use the opening indentation, including tabs. Nonempty displays keep native
-Enter. Body dollars and mismatched closers stay literal. Inline single-dollar
-math and backslash parentheses/brackets are outside this rule.
-
-Comments, existing math and verbatim/listing/minted environments stay literal.
-Inline \verb spans (including unfinished spans) are protected. \lstinline and
-\mintinline conservatively protect their remaining line. Opening recovery in
-unfinished document/center/list/figure and other known text environments is
-bounded to 256 syntax nodes. Unknown environments, unresolved earlier
-delimiters and missing/pending parser context keep original input. No full
-synchronous parse or buffer-wide text scan is requested.
-
-close defaults to '$$'. open/skip/delete/newline default to true and are
-independent. false disables the rule. Overrides follow global multi_pairs,
-filetype, then b:pairs_multi_rules. Native undo/redo/dot are preserved. For a
-completion-owned Enter, use accept -> expr('<CR>') -> fallback as usual.
-
-LATEX BACKSLASH MATH                                     *pairs-tex-slash*
-
-Enable inline and display math independently, with the latex parser: >lua
-    require('pairs').setup({
-      treesitter = true,
-      filetypes = {
-        tex = { multi_pairs = { ['\\('] = {}, ['\\['] = {} } },
-        plaintex = { multi_pairs = { ['\\('] = {}, ['\\['] = {} } },
-      },
-    })
-<
-Typing \( produces \(|\); typing \[ produces \[|\]. | denotes the insertion
-cursor. The backslash prefix must be unescaped and parser-confirmed text;
-existing math/comments/literal code, unknown environments and unsafe incomplete
-syntax preserve input. The next character must permit pairing. Opening can
-follow ordinary text; it does not require a standalone display line.
-
-Typing \) or \] at a confirmed closer skips both existing characters one at a
-time, including the backslash. A bare ) or ] before the whole closer remains
-literal. <BS> removes an adjacent empty pair. <CR> in \[|\] creates three lines
-with opening indentation on the body and closer. Inline/nonempty formula Enter
-stays native by default. Undo/redo/dot retain the full insertion.
-
-close defaults to '\\)' or '\\]'. open/skip/delete default to true. newline is
-false for '\\(' and true for '\\[' and can be overridden independently.
-false disables either rule. Precedence and missing/pending parser fallback are
-unchanged. Ordinary brackets and backslash commands keep their usual behavior.
-
-Either rule installs a deferred Insert backslash mapping in addition to the
-bracket keys. Existing mappings are preserved and reported in status().conflicts;
-custom owners can compose expr('\\') to skip the backslash of a proven closer.
-Completion/snippet edits are not re-paired. For completion-owned Enter, use
-accept -> expr('<CR>') -> fallback as usual.
-
-LATEX ENVIRONMENT DECLARATIONS                           *pairs-tex-env*
-
-tex_environments extends known modes in tex/plaintex. Requires current latex
-parser context; declarations do not enable math delimiter rules themselves: >lua
-    require('pairs').setup({
-      treesitter = true,
-      tex_environments = {
-        abstract = 'text', theorem = 'text', proof = 'text',
-        mymath = 'math', mycode = 'literal',
-      },
-      multi_pairs = { ['$$'] = {}, ['\\('] = {}, ['\\['] = {} },
-    })
-<
-text       Allow configured math pairs at proven boundaries.
-math       Keep math delimiter input literal; ordinary brackets still pair.
-literal    Keep all pairing keys native, including quote/bracket input, BS, CR.
-false      Remove a text/custom declaration; treat the name as unknown.
-
-Defaults include document/list/figure/etc. text environments and the parser's
-built-in math/raw environments. Built-in protection cannot be weakened/removed;
-math can be strengthened to literal. Parser-confirmed math/comments/raw nodes
-remain protected. Names match exactly, including star suffixes (no wildcards).
-Names are 1-62 ASCII letters/digits or _, ., :, -, * characters.
-
-Precedence: defaults -> global tex_environments ->
-filetypes[ft].tex_environments -> b:pairs_tex_environments. For example: >lua
-    vim.b.pairs_tex_environments = { proof = 'text', mycode = 'literal' }
-<
-Inner text cannot lift outer math/literal restrictions. Raw code ignores other
-environment-looking text until its own matching end. Closed sibling scopes do
-not leak. Complete begin headers establish modes before an end is written,
-including trailing blank lines; partial headers remain conservative. Each
-prefix traversal visits at most 256 syntax nodes and excludes future content.
-Custom raw modes inspect preceding scope metadata; unresolved/over-budget
-prefixes keep all pairing keys native. No full buffer-text scan or synchronous
-parse is requested. Mismatched/unprovable scopes preserve input.
-
-VimTeX indentation, mapping ownership and completion/snippet expansion remain
-independent. Missing parsers use the existing line-local lexer fallback;
-environment modes require parser evidence. Pending parses pass keys through.
-Invalid setup options preserve existing setup; invalid buffer declarations
-pass through with explain().reason='context_error'.
-
-LATEX COMMAND ARGUMENTS                                  *pairs-tex-args*
-
-With treesitter=true and a current latex parser, built-in command parameters
-have their own context in tex/plaintex. No new setup option is needed: >lua
-    require('pairs').setup({
-      treesitter = true,
-      multi_pairs = { ['\\('] = {} },
-    })
-<
-Text: section/subsection/subsubsection/chapter/part/paragraph/subparagraph
-(including starred forms and optional titles), textbf/textit/textrm/textsf/
-texttt/textnormal/emph/underline. Ordinary brackets and configured \( ... \)
-pairs work inside their text arguments; display openings \[ and $$ stay native.
-
-Raw: url/nolinkurl/path payloads and href's first mandatory argument preserve
-quote/bracket/math input, BS and CR. href's second mandatory argument is text;
-its optional settings stay conservative for math. Payload %20 and quotes do not
-poison following text after the argument ends; a real following comment remains
-protected. Escaped braces and nested groups are accounted for.
-
-Outer argument braces and heading optional-title brackets follow normal rule
-options. Proven structural closers can be skipped, even across lines. BS between
-empty outer delimiters can delete both. Interior raw brackets remain native.
-Typing \( at \textbf{|} yields \textbf{\(|\)}; typing ( at \url{|} yields
-\url{(|}. Here | marks the insertion point, not a literal character.
-
-Incomplete parameters and trailing blank lines use current syntax anchors and
-a prefix of at most 32 lines/4096 bytes. The byte budget is checked before
-reading; future body text and full buffer scans are not requested. Unsafe or
-over-budget recovery preserves input. Unknown command parameters remain
-conservative for math. Outer math/raw environments, comments and text-in-math
-nodes keep their restrictions. Missing parsers use the line-local fallback;
-pending parses pass through without forcing synchronous parsing. With
-treesitter enabled, LaTeX lines beyond max_scan_bytes also pass through so a
-long future suffix cannot bypass raw protection.
-
-VimTeX indentation, completion/snippets and mapping ownership keep their own
-behavior. Built-in profiles above are fixed, not a configurable command API.
-
-ENTER                                                    *pairs-enter*
-
-<CR> between adjacent empty brackets creates an indented middle line and a
-closing line. Strings, comments, quotes and nonempty pairs pass through.
-Indentation uses indentexpr or cindent when configured. Otherwise it adds one
-shiftwidth to the opening line and aligns the closer with that line. Tabs and
-vartabstop are respected. Undo, redo and dot repeat retain the entire insertion;
-dot replays the resulting indentation from the original insertion.
-
-Existing Enter mappings are preserved. For a completion-owned Enter, set
-mappings.cr=false and compose expr('<CR>') after completion confirmation and
-before the owner's native fallback. See the blink.cmp example in README.md.
-
-FAST WRAP                                                *pairs-fast-wrap*
-
-Wraps the next same-line identifier, dotted member chain or complete function
-call after a standard opening bracket:
-  (|fn(a, b)     -> (fn(a, b))|
-  (|obj.get())   -> (obj.get())|
-  (|)fn(g(x))    -> (fn(g(x)))|
-  (|obj.value    -> (obj.value)|
-  (|obj.value)   -> (obj.value)|
-  (|)obj.value   -> (obj.value)|
-  (|value        -> (value)|   insert a missing closer
-  (|value)       -> (value)|   reuse an immediately following closer
-  (|)value       -> (value)|
-  [|]item_2      -> [item_2]|
-  fn((|)value, x) -> fn((value)|, x)
-
-The shortcut is unmapped by default. Opt in with:
->lua
-    require('pairs').setup({ mappings = { fast_wrap = '<M-e>' } })
-<
-Use a recognized single non-text key such as <M-e> or <F8>. Text keys,
-BS/CR/Tab/Escape and command pseudo-keys are rejected before setup. Existing
-global/buffer mappings are preserved; conflicts are reported. The owned
-shortcut flushes queued text and is a no-op when wrapping is unavailable.
-mappings.enabled=false prevents its installation.
-
-fast_wrap() returns native keycodes or nil for caller fallback; it does not
-edit the buffer when called. Compose it in an expression mapping using
-replace_keycodes=false. Account for queued text with the <Ignore>/private
-expression pattern described in |map-expression|.
-
-Type ( before existing text, then invoke fast wrap to supply its missing closer.
-The existing normal opening policy is unchanged. The cursor must immediately
-follow (, [ or {, with the target after the cursor or an adjacent closer.
-Each identifier matches [A-Za-z_][A-Za-z0-9_]*. Member chains join these with
-single dots and no whitespace, e.g. self.name or config.options.enabled.
-A callee may have one immediately adjoining, complete (...) call. Arguments
-may contain nested (), [] and {}, ordinary single/double-quoted strings and
-backslash escapes. Unicode/tabs in arguments stay unchanged; callees remain
-ASCII. This proves bracket/quote boundaries, not language-level validity.
-Incomplete/mismatched calls, incomplete members, repeated dots, Unicode callees,
-leading whitespace, padded pairs, indexing and adjoining operators do not wrap.
-Chaining after calls (fn()(), fn().value, fn()[0]) and obj?.value stay untouched.
-Comments, backticks, triple/long/raw/interpolated literals inside arguments are
-conservatively rejected. JS/TS/Ruby/Swift slash expressions, including division, stay
-untouched because a slash may start a regex. End of line, whitespace, commas,
-semicolons and standard closers terminate a target; suffix text stays unchanged.
-The whole contiguous chain/call wraps.
-A matching closer must immediately follow the target to be reused. Spaces and
-other suffix text are preserved. Reuse follows current bracket nesting; other
-unclosed outer brackets are not repaired.
-
-wrap defaults to true for standard brackets, false for other rules. Disable it
-globally/per-filetype/in b:pairs_rules. It is independent of open/skip/delete/
-space/skip_space. Strings/comments, unsafe/pending syntax, escaped/unmatched
-prefixes and structural interpolation delimiters do not wrap. Prefix and target
-including call arguments/closer share max_scan_bytes, with one boundary byte.
-Missing parsers use the existing line-local lexer fallback.
-Changing a standard closer to a custom one disables inherited wrapping, keeping
-existing custom rules valid. Explicit wrap=true requires a standard pair.
-
-Native movement and any required deletion/insertion retain undo/redo/dot. Dot replays the
-recorded movement length, without choosing a new target. Inspect with
-:PairsInspect <FastWrap>. Traces record logical key <FastWrap>, wrap policy and
-target byte length, remove_close and insert_close flags (including false values).
-The adapter converts call text to native movement steps, accounting for composing
-characters and virtual editing inside tabs. Trace move remains a byte length;
-internal target text is omitted since the input snapshot already captures it.
-Reproduce exports via fast_wrap() or expr('<FastWrap>');
-<FastWrap> is an API action name, not a physical key.
-
+==============================================================================
 SPACE PADDING                                            *pairs-space*
 
-Padding is disabled by default. Enable it per standard bracket rule: >lua
+Disabled by default. Enable per standard bracket: >lua
     require('pairs').setup({
       pairs = {
         ['('] = { space = true },
@@ -412,183 +77,246 @@ Padding is disabled by default. Enable it per standard bracket rule: >lua
       },
     })
 <
-Here | marks the insertion cursor:
+Here and below, | marks the insertion cursor:
   (|)   + Space -> ( | )
-  [|]   + Space -> [ | ]
-  { | } + BS    -> {|}
-  { | } + CR    -> opening line, indented middle line, closing line
+  ( | ) + Space -> (  | )
+  ( | ) + BS    -> (|)
 
-Only adjacent empty brackets add two ASCII spaces. Paired BS/CR requires
-exactly one space on each side of the cursor. BS retains the delimiters;
-another BS can remove the remaining empty pair. CR trims the padding before
-the existing indentexpr/cindent/fallback logic. Native undo/redo/dot are kept.
-space is independent of open; delete controls paired BS and newline controls
-paired CR. The option also handles identical manually inserted padding.
+Only the first space is mirrored. Further spaces insert normally. Paired BS
+requires exactly one ASCII space on each side; another BS removes the empty
+brackets. Enter trims padding before expanding. Identical manual padding works
+the same way. delete/newline control removal/Enter independently of open.
 
-For Space/BS/CR, nonempty brackets, repeated spaces, tabs, strings/comments,
-escaped/unproven openers, pending syntax and over-budget scans preserve native
-input.
-Structural interpolation braces retain their language rule. Ordinary brackets
-inside its expression can opt in. Closer skipping requires an adjacent closer
-by default. To cross one right-hand space, opt in separately:
->lua
-    require('pairs').setup({
-      pairs = {
-        ['('] = { space = true, skip_space = true },
-        ['['] = { space = true, skip_space = true },
-        ['{'] = { space = true, skip_space = true },
-      },
-    })
+Set skip_space=true separately on a standard bracket rule:
+  ( value| ) + ) -> ( value )|
+This requires skip=true, a matching same-line opener, and exactly one ASCII
+space before the closer. It works independently of space. Both options default
+to false. Space/paired BS apply only to empty brackets; tabs, strings and
+comments use ordinary input.
+
+==============================================================================
+FAST WRAP                                                *pairs-fast-wrap*
+
+Opt into an Insert-mode shortcut: >lua
+    require('pairs').setup({ mappings = { fast_wrap = '<M-e>' } })
 <
-( value| ) + ) -> ( value )|; nested brackets work the same way.
-skip_space defaults to false, requires skip=true, and works independently of
-space. Manually entered padding also works. Enabling only skip_space does not
-map Space. Only (), [] and {} support skip_space=true.
+Invoke immediately after (, [ or { to wrap the next same-line target:
+  (|value       -> (value)|
+  (|obj.value   -> (obj.value)|
+  (|)fn(a, b)   -> (fn(a, b))|
+A matching closer can be inserted, reused after the target, or moved from an
+adjacent empty pair. No shortcut is installed by default. Use a recognized
+non-text key; BS/CR/Tab/Escape cannot be the shortcut. Existing owners win.
 
-The right side must be exactly one ASCII space immediately followed by the
-matching closer. The existing bounded scan must prove a same-line opener.
-Multiple spaces, tabs, intervening text, strings/comments, escaped/unmatched
-prefixes and pending syntax keep ordinary input. Structural interpolation
-closers retain their language rules. Global/filetype/b:pairs_rules precedence
-is unchanged. Native movement preserves text, undo/redo/dot; trace exports
-include skip_space and the two-position movement.
+Targets are ASCII identifiers, dotted chains, or one adjoining complete (...)
+call. Nested standard brackets, ordinary quoted strings and Unicode arguments
+are supported. Incomplete/mismatched calls, indexing, call chaining, comments,
+advanced literals and ambiguous JS/TS/Ruby/Swift slash expressions do not
+wrap. Prefix and target share max_scan_bytes. Per-rule wrap=false disables
+wrapping. Undo/redo/dot are preserved; dot replays the original movement
+length.
 
-Space is mapped only if setup declares an enabled space rule globally or for
-a filetype, and mappings.space=true. Existing owners are preserved. With
-mappings.space=false, compose expr('<Space>') before the owner's fallback.
-The API also accepts a literal space. Enter composition remains expr('<CR>').
-Overrides follow global/filetype/buffer precedence. Buffer-only activation
-needs an existing setup-declared Space mapping or a composed owner mapping.
-Only (), [] and {} support space=true; quotes/multi-character pairs do not.
+fast_wrap() and expr('<FastWrap>') return keycodes or nil for caller fallback.
+<FastWrap> is a logical API action, not a physical key. Preview with
+:PairsInspect <FastWrap>. See |pairs-api| for composed mappings.
 
+==============================================================================
+LANGUAGE RULES
+
+All rules below are opt-in and require treesitter=true with the appropriate
+installed parser. Declare multi_pairs globally or under filetypes[ft].
+Precedence is global -> filetype -> b:pairs_multi_rules. An empty table
+enables a rule; false disables it. Closers are implicit. Independent open,
+skip, delete and newline flags default to true except where noted below.
+
+PYTHON TRIPLE QUOTES                                      *pairs-triples*
+
+For filetype python: >lua
+    filetypes = {
+      python = {
+        multi_pairs = {
+          [string.rep('"', 3)] = {},
+          [string.rep("'", 3)] = {},
+        },
+      },
+    }
+<
+Typing the third identical quote after an empty string creates a triple pair.
+Python string prefixes are supported. Closing quotes skip one at a time; BS
+removes an adjacent empty triple; Enter creates body/closing lines aligned
+with the opener. Missing/pending syntax retains ordinary quote behavior.
+
+JAVASCRIPT / TYPESCRIPT TEMPLATES                         *pairs-templates*
+
+For javascript/javascriptreact/typescript/typescriptreact: >lua
+    local templates = {
+      pairs = { ['`'] = { close = '`' } },
+      multi_pairs = { ['${'] = {} },
+    }
+    -- Use templates as filetypes[ft] for each desired JS/TS filetype.
+<
+Backticks pair templates (including tagged templates) and skip real closers.
+In template text, { after an unescaped $ creates ${|}; ordinary literal quotes
+and braces stay native. Interpolation bodies use normal code pairing.
+BS in ${|} removes all three characters; Enter expands the empty expression.
+Enter inside template text stays native. Backticks use single-character
+open/skip/delete flags; interpolation uses the multi-character flags.
+
+MARKDOWN CODE FENCES                                      *pairs-fences*
+
+For markdown: >lua
+    filetypes = {
+      markdown = { multi_pairs = { ['```'] = {}, ['~~~'] = {} } },
+    }
+<
+Enter after a new fence of at least three backticks/tildes and optional info
+creates a blank body and matching closing fence. The opening length,
+indentation and list/blockquote continuation are retained. Both open and
+newline must be true. Closing fences skip one character at a time at proven
+closing positions. Existing code, inline code and invalid fence positions
+retain ordinary input. Backspace stays native; delete=true is unsupported.
+Inline backticks are not paired by this option.
+
+LATEX MATH                                               *pairs-tex*
+                                                         *pairs-tex-slash*
+For tex/plaintex with the latex parser: >lua
+    local math = { multi_pairs = {
+      ['$$'] = {}, ['\\('] = {}, ['\\['] = {},
+    } }
+    -- Use math as filetypes.tex and/or filetypes.plaintex.
+<
+  $|    + $   -> $$|$$       only on an otherwise blank/indented line
+  |     + \(  -> \(|\)
+  |     + \[  -> \[|\]
+Closing delimiters skip one character at a time, including their backslash.
+BS removes adjacent empty pairs. Enter expands empty $$ and \[ pairs;
+\( has newline=false by default. Single-dollar inline math is not paired.
+Comments, existing math, literal code and unknown contexts remain protected.
+
+LATEX ENVIRONMENTS                                       *pairs-tex-env*
+
+Extend known environment modes globally, per filetype or buffer: >lua
+    tex_environments = {
+      theorem = 'text', proof = 'text', mymath = 'math', mycode = 'literal',
+    }
+<
+text allows configured math at valid boundaries; math suppresses math
+delimiter pairing; literal keeps all plugin-owned keys native. false removes a
+custom/text declaration. Names match exactly, including star suffixes (no
+wildcards), and use 1-62 ASCII letters/digits or _, ., :, -, * characters.
+Built-in math/raw protections cannot be weakened or removed. Inner text cannot
+lift an outer restriction. Environment declarations do not enable delimiter
+rules.
+
+LATEX COMMAND ARGUMENTS                                  *pairs-tex-args*
+
+Built-in text arguments (section headings, textbf/textit/textrm/textsf/texttt/
+textnormal/emph/underline) allow ordinary pairs and configured inline \( math;
+display math openings stay native. Heading optional titles count as text.
+url/nolinkurl/path and href's first mandatory argument keep payload keys
+native; href's second mandatory argument is text. Outer argument delimiters
+still use normal pair rules. User-defined command profiles are not
+configurable.
+
+==============================================================================
+ENTER AND COMPLETION                                     *pairs-enter*
+
+Enter between adjacent empty brackets creates an indented middle line and a
+closing line. Uses indentexpr/cindent, otherwise shiftwidth; tabs are
+respected. Nonempty pairs and ordinary newlines pass through. Undo/redo/dot
+are preserved.
+
+If completion owns Enter, set mappings.cr=false and compose expr('<CR>') after
+completion acceptance, before native fallback. For blink.cmp: >lua
+    keymap = {
+      ['<CR>'] = {
+        'accept',
+        function() return require('pairs').expr('<CR>') end,
+        'fallback',
+      },
+    }
+<
+Completion/snippet buffer edits are not re-paired. Existing global mappings
+are preserved; buffer mappings take precedence. Disable competing auto-pairs
+plugins.
+
+==============================================================================
 API                                                      *pairs-api*
 
-setup(opts)            Validate config and install non-conflicting mappings.
-expr(key)              Return handled keycodes, or nil for caller fallback.
-handle(key)            Return handled or original keycodes.
-fast_wrap()            Return wrap keycodes, or nil for caller fallback.
-explain(key, opts)     Return action/reason without editing; Insert mode by
-                      default. opts.assume_insert previews insertion before
-                      the Normal-mode cursor.
-enable([bufnr])        Enable globally, or enable one buffer.
-disable([bufnr])       Disable globally, or disable one buffer.
-toggle([bufnr])        Toggle globally, or toggle one buffer.
-status()              Initialization, global enabled state, mapping conflicts.
-teardown()            Remove only mappings still owned by this plugin.
+All functions below are in require('pairs'):
+  setup(opts)         Validate options and install non-conflicting mappings.
+  expr(key)           Return handled keycodes, or nil for caller fallback.
+  handle(key)         Return handled or original keycodes; logical FastWrap
+                      falls back to an empty string.
+  fast_wrap()         Return wrap keycodes, or nil for caller fallback.
+  explain(key, opts)  Return action/reason without editing. Insert mode by
+                      default; opts.assume_insert=true previews insertion
+                      before the Normal-mode cursor.
+  enable([bufnr])     Enable globally, or for one buffer (0 = current).
+  disable([bufnr])    Disable globally, or for one buffer.
+  toggle([bufnr])     Toggle globally, or for one buffer.
+  status()            Initialization, enabled state and mapping conflicts.
+  teardown()          Remove only mappings still owned by this plugin.
 
-Use key notation such as '<BS>' or '<CR>'. expr()/handle() return termcodes; mappings
-should use { expr = true, replace_keycodes = false }.
-Logical action '<FastWrap>' also works with expr()/explain(); handle() returns
-an empty string for that action on fallback. See |pairs-fast-wrap|.
-Plugin-owned mappings use <Ignore> before a private expression mapping to flush
-preceding typed text. Composed mappings should consider |map-expression| order.
+Use '<BS>', '<CR>', '<Space>' or logical '<FastWrap>' for special actions.
+Disable the relevant owned mapping when composing your own, e.g.
+mappings.space=false or mappings.enabled=false. Use expression mappings with
+replace_keycodes=false. Returned keycodes do not edit the buffer by
+themselves. Preceding input may still be queued: see |map-expression| for the
+<Ignore> pattern used by the plugin's private expression mappings.
 
 COMMANDS                                                 *pairs-commands*
 
-:PairsToggle           Toggle pairing globally.
-:PairsInspect {key}    Preview insertion before the cursor; does not edit text.
-:PairsTrace {action}   Trace actual key decisions; see |pairs-trace|.
-:checkhealth pairs     Inspect initialization and setup-time mapping conflicts.
+  :PairsToggle         Toggle globally.
+  :PairsInspect {key}  Explain insertion before the cursor without editing.
+  :checkhealth pairs   Check initialization and setup-time mapping conflicts.
 
 TRACE                                                    *pairs-trace*
 
-After loading the plugin, reproduce a mispair with: >vim
+After loading, capture an actual mispair: >vim
     PairsTrace clear
     PairsTrace start
-    " Edit to reproduce the unexpected behavior, then return to Normal mode.
+    " Reproduce while editing, then return to Normal mode.
     PairsTrace stop
     PairsTrace show
     PairsTrace export /tmp/pairs-trace.json
 <
-Tracing is disabled by default. Only expr()/handle() calls record actual key
-decisions, including composed fallbacks. explain()/PairsInspect do not record.
-Completion/snippets that handle a key without calling pairs.nvim do not record.
-The disabled path performs no diagnostic reads, copies or timing. Recording
-does not request a second parse or change the returned keys.
+Tracing is off by default. It records actual expr()/handle() decisions, not
+explain()/PairsInspect queries or keys handled entirely by completion. The
+latest 100 entries contain the key, pre-edit byte cursor, nearby text (capped
+at 4096 bytes), effective rules and available syntax state. show opens a
+readonly scratch split; stop retains entries; clear resets them. Export is
+explicit/local. Use :PairsTrace! export {file} to overwrite. JSON positions
+are zero-based rows/byte columns. Surrounding lines, parser state, indentation
+callbacks and mapping owners are not serialized; add context when reproducing
+multiline issues. Observed output is not an expected assertion.
 
-The newest 100 entries retain the pre-edit key/cursor, filetype, local line,
-observed action/reason, effective delimiter policy and available syntax state.
-Older entries are discarded and counted. Local lines are capped at 4096 bytes
-around the cursor, preserving valid UTF-8 boundaries and marking clipping.
-No entire buffer, filename or parser tree is retained.
-
-show opens a readonly scratch split. stop retains entries; start resumes;
-clear resets entries without changing the switch. Successful re-setup keeps
-tracing active. teardown stops capture without deleting retained entries.
-A recorder error stops tracing and appears in status/show; typing continues.
-
-export {file} creates a new local JSON file. Use PairsTrace! export {file} to
-replace an existing file. Escape spaces in filenames using |fnameescape()|.
-There are no automatic writes. Schema 1 records zero-based rows/byte columns;
-input.start_col is the original byte column of the captured line slice.
-The scratch view uses one-based rows/byte columns.
-
-Observed output is not an expected assertion: confirm intended behavior before
-creating a regression case. Surrounding lines, parser scheduling/trees,
-language declarations, indentation callbacks, completion/snippets and mapping
-ownership are not serialized. Clipping, missing effective rules and enabled
-callback/runtime state dependencies are marked. Add context manually when a
-multiline/parser issue requires it.
-
-Lua API: >lua
-    local trace = require('pairs.trace')
-    trace.clear()
-    trace.start()
-    -- Edit, then stop before inspecting or explicitly exporting.
-    trace.stop()
-    local entries = trace.entries() -- independent chronological copies
-    local status = trace.status() -- active/count/capacity/dropped/error
-<
-trace.export(path) creates a new JSON file; trace.export(path, true) replaces
-an existing file. show() returns its scratch buffer number. These are separate
-from setup options. The trace module does not install mappings.
+Lua API in require('pairs.trace'): start(), stop(), clear(), entries(),
+status(), show(), export(path[, overwrite]). entries() returns independent
+chronological copies. teardown stops tracing and retains records.
 
 BENCHMARK                                                *pairs-bench*
 
-From the plugin checkout: >sh
-    ./tests/bench.sh
-    PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers \
-      PAIRS_BENCH_OUTPUT=/tmp/pairs-benchmark.json ./tests/bench.sh
-<
-Use tests/install-parsers.sh to prepare the optional pinned parser fixtures.
-The benchmark runs in isolated XDG directories and reports decision timing
-in microseconds (median/P95/max), plus separate mapped input batch timing.
-Mapped batches check resulting text, undo/redo and dot repeat.
-
-PAIRS_BENCH_SAMPLES defaults to 1000 (minimum 100), PAIRS_BENCH_LINES to 50000
-(minimum 1000), and PAIRS_BENCH_MAPPED_SAMPLES to 20 (minimum 5).
-PAIRS_BENCH_PROFILE=1 adds an instrumented stage breakdown outside the latency
-measurements. JSON includes source/benchmark fingerprints and environment data.
-The separate GC-paused Lua heap estimate measures allocation growth, not
-retained memory. Screen rendering and physical keyboard latency are excluded.
-CI checks behavior without timing thresholds. See docs/BENCHMARKS.md for methods
-and a measured before/after comparison.
+From the checkout, run ./tests/run.sh or ./tests/bench.sh. Optional pinned
+parser fixtures: tests/install-parsers.sh /tmp/pairs-parsers, then set
+PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers. Benchmarks measure headless
+decisions and mapped input, excluding screen/keyboard latency. See
+docs/BENCHMARKS.md for options, methodology and measured results; docs/PLAN.md
+for implementation notes.
 
 LIMITS                                                   *pairs-limits*
 
-The fallback lexer is line-local. It recognizes common line comments and basic
-quoted strings, not complete language grammars. Escaping uses backslash parity;
-non-ASCII neighbors conservatively block quote opening. Malformed bracket
-prefixes and scans exceeding max_scan_bytes pass through.
+The fallback lexer is line-local and recognizes basic strings/common comments.
+With treesitter=true, installed parsers protect multiline/raw strings and
+block comments, while supported interpolation expressions remain code. Missing
+parsers fall back to the lexer. Pending/unsafe syntax, malformed prefixes,
+scan-budget limits and context errors pass keys through. Parsing is
+time-sliced; the plugin does not wait for completion, install parsers or start
+highlighting.
 
-treesitter=true protects raw/multiline strings and block comments. Python
-f-string expressions and JavaScript/TypeScript template substitutions are code;
-format/literal text stays protected. Completed string/comment nodes are masked
-in the current line prefix before the lexer checks nesting.
-
-Stale/unparsed trees are refreshed using Neovim's time-sliced parse callback
-API. No full synchronous parse or wait is requested. Pending trees and unsafe
-incomplete literals pass keys through. Missing parsers use the line-local lexer.
-Current-line traversal is bounded to 256 nodes (syntax_limit on overflow).
-This option does not install parsers or start highlighting. See README.md for
-pinned parser fixtures used by the regression suite.
-
-Existing global mappings are preserved; buffer mappings take precedence.
-Paste, macro recording/replay, Replace mode, and special buffers bypass pairing.
-Runtime context errors pass through and are exposed by explain().
-
-Other multi-character pairs, general expression/selection wrapping and
-command-line mode are planned.
-See README.md and docs/PLAN.md in the checkout for details.
+Paste, macro recording/replay, Replace mode and special buffers bypass
+pairing. General expression/selection wrapping, arbitrary multi-character
+delimiters and command-line mode are not supported. See README.md for
+installation.
 
  vim:tw=78:ts=8:ft=help:norl:
