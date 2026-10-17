@@ -2,7 +2,8 @@
 
 Conservative quote and bracket pairing for Neovim 0.11+. Pure Lua, no runtime
 dependencies. Supports matching-closer skipping, paired Backspace, indented
-Enter, optional space padding, fast wrap, and syntax-aware language rules.
+Enter, optional space padding, fast wrap, optional surround editing, and
+syntax-aware language rules.
 
 ## Install
 
@@ -107,6 +108,71 @@ with `treesitter = true` and an installed parser. Space, Backspace and Enter
 follow the same padding rules, retaining each family's Enter behavior.
 `space` defaults to false and is unsupported for Markdown fences.
 
+### Surround editing
+
+Enable an independent, parser-free surround module with mini.surround-style
+keys. It is disabled by default. Disable mini.surround before using the same
+keys, and load pairs.nvim before Normal-mode editing (for example on
+`VeryLazy`, instead of only `InsertEnter`):
+
+```lua
+require("pairs").setup({
+  surround = { enabled = true },
+})
+```
+
+- `sa{motion}{id}` adds surroundings; `saiw"` wraps a word in double quotes.
+  `sa_` wraps the line while preserving its outer whitespace. Visual `sa{id}`
+  wraps the selection. User text objects, including mini.ai mappings, work.
+- `sd{id}` deletes surroundings; `sd)` changes `(word)` to `word`.
+- `sr{old}{new}` replaces surroundings; `sr)"` changes `(word)` to `"word"`.
+- `sf{id}` / `sF{id}` cycle right / left through the delimiter endpoints.
+- `sh{id}` highlights the delimiters for 500ms; `sn` changes the current
+  buffer's search range after a prompt.
+
+Opening bracket identifiers `(`, `[`, `{`, `<` add inner spaces and trim inner
+whitespace when deleting/replacing. Closing identifiers use compact output
+and preserve inner whitespace. `b` searches any of `()[]{}` and outputs `()`;
+`q` searches any quote and outputs double quotes. `t` handles nested HTML/XML
+tags and prompts for a tag with optional attributes. `f` handles function
+calls and prompts for a function name. `?` prompts for literal left/right
+strings. Other characters surround with themselves; escaped delimiters are
+ignored during searches.
+
+Search defaults to the innermost surrounding that covers the cursor, within
+20 lines in either direction. Counts choose outer surroundings (`2sd)`), or
+repeat added wrappers (`2saiw)`). Motion counts work separately (`sa2aw)`).
+Suffix `l` / `n` searches previous / next surroundings (`sdl)`, `sdn)`).
+Normal-mode edits support native undo/redo, dot repeat and macros. Dot reuses
+the resolved identifiers and prompt answers at the new cursor. Visual edits
+support undo/redo; they do not register a new surround dot repeat.
+
+```lua
+surround = {
+  enabled = true,
+  n_lines = 20,
+  search_method = "cover", -- also cover_or_next/prev/nearest, next, prev, nearest
+  respect_selection_type = false, -- true: linewise blocks / wrap each block row
+  custom_surroundings = {
+    ["*"] = {
+      input = { left = "**", right = "**" },
+      output = { left = "**", right = "**" },
+    },
+  },
+}
+```
+
+Custom input/output specifications are literal strings or callbacks returning
+`{ left = ..., right = ... }` (or `nil` to cancel), including multiline strings.
+They use pairs.nvim's API, rather than mini.surround's Lua-pattern format.
+Filetype overrides use `filetypes.<ft>.surround`; live buffer overrides use
+`vim.b.pairs_surround_config`. Set `vim.b.pairs_surround_enabled = false` to
+disable only surround in a buffer. The global/buffer pairs toggle also applies.
+Surround mappings are configured globally; use `''` to disable a key, or
+`<Plug>(pairs-surround-add/delete/replace/find/find_left/highlight/update_n_lines)`
+for custom bindings. Existing mappings are preserved and reported by health.
+Search is bounded to 1 MiB by default. See `:help pairs-surround` for details.
+
 ### Fast wrap
 
 With `mappings.fast_wrap = "<M-e>"`, invoke the shortcut immediately after an
@@ -161,8 +227,9 @@ See `:help pairs-triples`, `pairs-templates`, `pairs-fences`, and `pairs-tex`.
 Tree-sitter also protects multiline/raw strings and block comments. Parsers are
 not installed automatically. Missing parsers use a line-local lexer; pending or
 unsafe syntax passes keys through. Work is bounded by `max_scan_bytes` (4096 by
-default). General expression/selection wrapping, arbitrary multi-character
-pairs and command-line mode are not supported.
+default). Fast wrap accepts only its documented targets; use surround for
+explicit motions/selections. Arbitrary multi-character auto-pair rules and
+command-line auto-pairing are not supported.
 
 ## Completion and mappings
 

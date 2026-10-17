@@ -5,6 +5,7 @@ Requires Neovim 0.11+. Pure Lua, no runtime dependencies.
   |pairs-setup|       Configuration and defaults
   |pairs-space|       Symmetric space padding
   |pairs-fast-wrap|   Wrap an identifier, member chain or call
+  |pairs-surround|    Add, delete, replace and locate surroundings
   |pairs-triples|     Python triple quotes
   |pairs-templates|   JavaScript/TypeScript templates
   |pairs-fences|      Markdown code fences
@@ -38,6 +39,7 @@ Options (only overrides are needed):
   mappings.fast_wrap   shortcut such as '<M-e>' or '<F8>', default false
   max_scan_bytes       scan budget in bytes, default 4096
   treesitter           use installed parsers, default false
+  surround             optional surround editing; see |pairs-surround|
   disabled_filetypes   default { 'TelescopePrompt', 'snacks_picker_input' }
   pairs                single-character rules; false disables a rule
   multi_pairs          opt-in language rules, default {}
@@ -64,6 +66,120 @@ Overrides merge: defaults -> global -> filetype -> live buffer options: >lua
 <
 New delimiter/Space mappings need a setup-time global/filetype declaration or
 an explicitly composed mapping. Buffer-only rules do not install mappings.
+
+==============================================================================
+SURROUND EDITING                                         *pairs-surround*
+
+Independent parser-free editing with mini.surround-style keys. Default off:
+>lua
+    require('pairs').setup({ surround = { enabled = true } })
+<
+Disable mini.surround before using these same keys. Load on VeryLazy (or
+BufReadPost/BufNewFile), rather than only InsertEnter, for Normal-mode use.
+Existing global mappings are preserved; buffer mappings take precedence.
+
+Defaults:
+  sa{motion}{id}    Add surroundings to a motion/text object; saiw" -> "word"
+  sa_              Add to the line, keeping outer whitespace
+  Visual sa{id}    Add to the selection
+  sd{id}           Delete surroundings; sd) removes parentheses
+  sr{old}{new}     Replace surroundings; sr)" changes parentheses to quotes
+  sf{id} / sF{id}  Cycle through delimiter endpoints right / left
+  sh{id}           Temporarily highlight the delimiters
+  sn               Prompt for this buffer's search range
+
+Normal add/delete/replace use native operators: one undo step, redo, dot
+repeat and macros. Dot reuses the original delimiter/prompt answers at the
+new cursor. Visual edits do not install a new dot-repeat operation.
+User motion/text-object mappings, including mini.ai, remain available.
+Count before sa repeats output wrappers; count after sa belongs to the
+motion. For sd/sr/sf/sF/sh, a count selects the nth matching surrounding.
+Suffix l/n chooses the previous/next target, e.g. sdl), srn)".
+
+Identifiers:
+  ( [ { <       Padded output; trim inner edge whitespace on input
+  ) ] } >       Compact output; retain inner whitespace on input
+  " ' `         Same-character quotes; escapes are respected
+  b             Any ()/[]/{} on input, () on output
+  q             Any quote on input, double quotes on output
+  t             Nested HTML/XML tags; output prompts for tag and attributes
+  f             Function calls; output prompts for function name
+  ?             Prompt for literal left and right strings
+  other         Same character on both sides (including Unicode)
+
+Tag search handles quoted attributes, same-name nesting, comments, HTML void
+elements and self-closing tags. Malformed/mismatched markup is not repaired.
+Function names accept ASCII identifiers and dotted chains. Searches are
+structural text searches; they do not classify comments or language semantics.
+
+Surround options (all in the surround table):
+  enabled                  false
+  n_lines                  20 lines in either direction from the cursor
+  search_method            'cover'; innermost containing region
+  highlight_duration       500 milliseconds
+  respect_selection_type   false
+  max_scan_bytes           1048576; reject over-budget search windows
+  custom_surroundings      {}; identifier -> { input, output } or false
+  mappings                 add='sa', delete='sd', replace='sr', find='sf',
+                           find_left='sF', highlight='sh', update_n_lines='sn',
+                           suffix_last='l', suffix_next='n'
+
+search_method also accepts cover_or_next, cover_or_prev, cover_or_nearest,
+next, prev and nearest. Without a matching candidate or on <Esc>, no edit
+is made. Scan limits reject the complete search, not a truncated target.
+Search also rejects windows above 256 nested delimiters or 10,000 candidates.
+
+With respect_selection_type=false, selections get a single surrounding.
+With true, linewise selections use separate delimiter lines and add one
+indent level; blockwise selections surround each row by display columns.
+Tabs and wide characters at block boundaries are kept whole; short rows
+clamp to end-of-line. Deleting delimiters on otherwise blank lines removes
+those lines and dedents one level.
+
+Custom specifications are literal strings, not mini.surround Lua patterns:
+>lua
+    surround = {
+      enabled = true,
+      custom_surroundings = {
+        ['*'] = {
+          input = { left = '**', right = '**' },
+          output = { left = '**', right = '**' },
+        },
+        L = {
+          output = function()
+            local name = vim.fn.input('LaTeX command: ')
+            if name == '' then return end
+            return { left = '\\' .. name .. '{', right = '}' }
+          end,
+        },
+      },
+    }
+<
+input/output may be callbacks returning { left=string, right=string } or nil
+to cancel. Input strings must be nonempty; output strings may be empty.
+Multiline strings are supported. Prompt answers are resolved before editing.
+Global options merge with filetypes.<ft>.surround and live buffer overrides:
+>lua
+    vim.b.pairs_surround_config = { n_lines = 50 }
+    vim.b.pairs_surround_enabled = false
+<
+Mappings are setup-time global options. Buffer/filetype overrides control
+behavior; they do not install new mappings. PairsToggle and pairs_enabled
+also apply to surround; unmodifiable and special buffers pass through.
+
+Lua API: require('pairs.surround')
+  start(action, method)     Expression mapping API for add/delete/replace;
+                           returns native operator keys (replace_keycodes=true)
+  visual()                 Add after leaving Visual mode, using '< and '> marks
+  action(action, method)   find/find_left/highlight/update_n_lines
+  status()                 enabled, owned mapping count and conflicts
+
+<Plug>(pairs-surround-{action}) exists in Normal mode for each action name;
+add also exists in Visual mode. Search actions have -prev/-next variants.
+Set a default mapping to '' to use only its Plug binding. Surround mapping
+ownership is cleaned up on teardown without deleting replacement mappings.
+PairsSurround defaults to IncSearch and may be customized with nvim_set_hl.
+There is no dependency on mini.surround or Tree-sitter.
 
 ==============================================================================
 SPACE PADDING                                            *pairs-space*
@@ -324,8 +440,8 @@ time-sliced; the plugin does not wait for completion, install parsers or start
 highlighting.
 
 Paste, macro recording/replay, Replace mode and special buffers bypass
-pairing. General expression/selection wrapping, arbitrary multi-character
-delimiters and command-line mode are not supported. See README.md for
-installation.
+pairing. Use |pairs-surround| for explicit motion/selection wrapping.
+Arbitrary multi-character auto-pair rules and command-line auto-pairing
+are not supported. See README.md for installation.
 
  vim:tw=78:ts=8:ft=help:norl:

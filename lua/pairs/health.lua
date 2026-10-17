@@ -25,6 +25,17 @@ function M.check()
   else
     vim.health.ok("No global mapping conflicts during setup")
   end
+  if status.surround.mappings > 0 then
+    vim.health.info("Surround mappings installed; see :help pairs-surround")
+    if #status.surround.conflicts > 0 then
+      vim.health.warn(
+        "Existing surround mappings preserved: " .. table.concat(status.surround.conflicts, ", "),
+        {
+          "Disable mini.surround before enabling the same keys in pairs.nvim, or use custom mappings",
+        }
+      )
+    end
+  end
   vim.health.info("Enter expansion is configurable; Tab is not mapped. See :help pairs-enter")
 end
 

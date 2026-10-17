@@ -41,6 +41,7 @@ M.defaults = {
   mappings = { enabled = true, bs = true, cr = true, space = true, fast_wrap = false },
   max_scan_bytes = 4096,
   treesitter = false,
+  surround = require("pairs.surround").defaults,
   disabled_filetypes = { "TelescopePrompt", "snacks_picker_input" },
   multi_pairs = {},
   tex_environments = vim.deepcopy(require("pairs.tex_env").defaults),
@@ -187,6 +188,7 @@ function M.build(opts)
     "pairs: max_scan_bytes must be a positive integer"
   )
   assert(type(config.treesitter) == "boolean", "pairs: treesitter must be boolean")
+  require("pairs.surround").validate(config.surround)
   assert(type(config.mappings) == "table", "pairs: mappings must be a table")
   for _, key in ipairs({ "enabled", "bs", "cr", "space" }) do
     assert(type(config.mappings[key]) == "boolean", "pairs: mappings." .. key .. " must be boolean")
@@ -229,6 +231,11 @@ function M.build(opts)
   metadata.default.tex = prepare_tex(config.tex_environments)
   for ft, overrides in pairs(config.filetypes) do
     assert(type(ft) == "string" and type(overrides) == "table", "pairs: invalid filetype override")
+    if overrides.surround ~= nil then
+      require("pairs.surround").validate(
+        vim.tbl_deep_extend("force", vim.deepcopy(config.surround), overrides.surround)
+      )
+    end
     if overrides.tex_environments ~= nil then
       require("pairs.tex_env").validate(overrides.tex_environments)
     end

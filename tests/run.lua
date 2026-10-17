@@ -1170,6 +1170,8 @@ dofile("tests/fast_wrap_call.lua")({
   plugin = plugin,
 })
 
+dofile("tests/surround.lua")({ test = test, eq = eq, seed = seed, feed = feed, plugin = plugin })
+
 plugin.teardown()
 if #failures > 0 then
   io.stderr:write(table.concat(failures, "\n\n") .. "\n")

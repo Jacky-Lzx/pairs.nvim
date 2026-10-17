@@ -8,8 +8,12 @@ function M.setup(opts)
   local candidate = require("pairs.config").build(opts)
   local mapping = require("pairs.mapping")
   mapping.detach()
+  require("pairs.surround").teardown()
   config, enabled = candidate, true
   mapping.attach(config, M.handle, M.fast_wrap)
+  require("pairs.surround").setup(config, function()
+    return enabled
+  end)
 end
 
 local function decide(key, opts)
@@ -78,6 +82,7 @@ end
 
 function M.teardown()
   trace.stop()
+  require("pairs.surround").teardown()
   require("pairs.mapping").detach()
   config = nil
 end
@@ -89,6 +94,7 @@ function M.status()
     enabled = enabled,
     mappings = #mapping.owned,
     conflicts = vim.deepcopy(mapping.conflicts),
+    surround = require("pairs.surround").status(),
   }
 end
 
