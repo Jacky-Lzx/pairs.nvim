@@ -6,6 +6,7 @@ Requires Neovim 0.11+. Pure Lua, no runtime dependencies.
   |pairs-space|       Symmetric space padding
   |pairs-fast-wrap|   Wrap an identifier, member chain or call
   |pairs-surround|    Add, delete, replace and locate surroundings
+  |pairs-rainbow|     Incremental rainbow bracket highlighting
   |pairs-triples|     Python triple quotes
   |pairs-templates|   JavaScript/TypeScript templates
   |pairs-fences|      Markdown code fences
@@ -39,6 +40,7 @@ Options (only overrides are needed):
   mappings.fast_wrap   shortcut such as '<M-e>' or '<F8>', default false
   max_scan_bytes       scan budget in bytes, default 4096
   treesitter           use installed parsers, default false
+  rainbow              rainbow highlighting options; see |pairs-rainbow|
   surround             optional surround editing; see |pairs-surround|
   disabled_filetypes   default { 'TelescopePrompt', 'snacks_picker_input' }
   pairs                single-character rules; false disables a rule
@@ -180,6 +182,69 @@ Set a default mapping to '' to use only its Plug binding. Surround mapping
 ownership is cleaned up on teardown without deleting replacement mappings.
 PairsSurround defaults to IncSearch and may be customized with nvim_set_hl.
 There is no dependency on mini.surround or Tree-sitter.
+
+==============================================================================
+RAINBOW BRACKETS                                         *pairs-rainbow*
+
+Enabled by default for (), [] and {}. Nested brackets cycle through seven
+colors; matching closers use the same color across lines. Unmatched closers
+keep their ordinary syntax color. Quotes are not colored. Rainbow highlighting
+is independent of pairing enable/disable/toggle, pairing rules and treesitter.
+Disabled filetypes, filetypes[ft].enabled=false and special buffers are excluded.
+
+Disable globally with rainbow.enabled=false in setup. Toggle the current buffer
+with :PairsRainbowToggle or require('pairs.rainbow').toggle(bufnr). Set
+b:pairs_rainbow=false to suppress coloring; this is checked on each redraw.
+The toggle function also refreshes the current display and starts a fresh scan.
+To enable colors before the first InsertEnter, load the plugin on BufReadPost
+and BufNewFile instead. Calling setup again cancels pending work and rebuilds
+the displayed buffers; teardown clears the provider, timers and cached data.
+
+Options under rainbow (only overrides are needed):
+  enabled                default true
+  debounce_ms            edit debounce delay, default 20; zero is allowed
+  budget_ms              soft background slice budget, default 2
+  max_lines              default 100000
+  max_bytes              default 2097152 (2 MiB, including line endings)
+  max_line_bytes         default 10000
+  max_depth              default 256
+  max_brackets           cached bracket character limit, default 100000
+  max_visible_brackets   per-window redraw limit, default 2000
+  priority               highlight priority, default 110
+  highlights             nonempty list of highlight group names
+
+The default highlight groups, in order, are:
+  PairsRainbowRed, PairsRainbowYellow, PairsRainbowBlue, PairsRainbowOrange,
+  PairsRainbowGreen, PairsRainbowViolet, PairsRainbowCyan.
+Customize them with nvim_set_hl(), or replace highlights with your own groups.
+ColorScheme events restore default groups without overwriting explicit colors.
+
+The lexer recognizes ordinary quotes and common line comments, Lua long
+strings/comments, Python triple strings, C-style block comments (nested in
+Rust/Swift), Rust raw strings/lifetimes, Go raw strings and nested JavaScript
+template expressions. Markdown/plain text use literal bracket nesting. Regex
+literals, JSX, language injections, TeX verbatim environments, heredocs and other
+specialized language constructs are not parsed. Use a dedicated parser-based
+highlighter when their exact syntax is required; disable this feature there.
+
+Line-boundary state is cached. Editing callbacks only invalidate state and queue
+work. Background slices scan at most 128 lines, checking the time budget after
+each line; the budget is soft (one line, cache maintenance and GC can exceed it).
+Line splices align the cached suffix outside the input callback. Scanning stops
+once state converges after all changed lines. Large replacements and bursts of
+more than 16 pending splices reset the cache. Rendering reads valid cached rows
+and emits ephemeral highlights only for visible lines; it never scans or parses.
+The paint cap bounds decoration calls for unusually dense windows. Hidden buffers
+release their cache and rebuild on display. Pending/invalid rows use normal
+syntax colors until scanning reaches them.
+
+Exceeding a buffer limit clears its rainbow colors, preserving automatic pairing.
+An edit retries the scan so shrinking a buffer recovers automatically. Inspect
+require('pairs.rainbow').status(bufnr) for enabled, pending, reason, valid_lines,
+scanned_lines, brackets, slices, work_ms and max_slice_ms. Reasons include
+line_count_limit, byte_limit, line_length_limit, depth_limit and bracket_limit.
+Counters are cumulative since buffer attachment; work_ms measures background
+work, excluding timers, actual UI rendering and input dispatch.
 
 ==============================================================================
 SPACE PADDING                                            *pairs-space*
@@ -437,7 +502,8 @@ block comments, while supported interpolation expressions remain code. Missing
 parsers fall back to the lexer. Pending/unsafe syntax, malformed prefixes,
 scan-budget limits and context errors pass keys through. Parsing is
 time-sliced; the plugin does not wait for completion, install parsers or start
-highlighting.
+Tree-sitter highlighting. Rainbow coloring uses a separate lexer; see
+|pairs-rainbow| for its scope and limits.
 
 Paste, macro recording/replay, Replace mode and special buffers bypass
 pairing. Use |pairs-surround| for explicit motion/selection wrapping.

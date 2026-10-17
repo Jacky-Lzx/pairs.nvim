@@ -1,5 +1,43 @@
 # Input benchmark
 
+## Rainbow brackets: 2026-10-18
+
+Run `./tests/bench-rainbow.sh` with isolated XDG directories. Options are
+`NVIM`, `PAIRS_BENCH_LINES` (default 50000, range 1000-100000),
+`PAIRS_BENCH_SAMPLES` (default 100, minimum 20), and `PAIRS_BENCH_OUTPUT`
+(optional JSON path). This benchmark sets debounce_ms=0 to separate processing
+from the default 20 ms quiet period. It measures a 50,000-line Lua buffer of
+`f(value)` lines, replaces/inserts/deletes near the middle, and asserts that
+incremental scanning visits only 1/2/1 lines respectively. Initial loading is
+time-sliced; insert samples accumulate lines and delete samples remove them.
+The bracket limit is raised just enough to accommodate those inserted samples.
+
+One run on macOS 26.6.2, Neovim 0.12.6, 100 samples:
+
+| Edit | Lines rescanned | Edit median / P95 (us) | Background median / P95 (us) |
+| --- | ---: | ---: | ---: |
+| Replace one line | 1 | 2.00 / 20.25 | 4.42 / 7.83 |
+| Insert one balanced line | 2 | 2.12 / 16.08 | 18.25 / 29.13 |
+| Delete one line | 1 | 1.79 / 13.54 | 12.42 / 22.04 |
+
+The edit timer includes `nvim_buf_set_lines` and the invalidation callback,
+excluding background scanning. Background work includes cache maintenance,
+scanning and requesting redraw, excluding the timer interval and actual UI
+rendering. Initial scan CPU work was 43.99 ms across 391 slices (maximum
+0.59 ms); completion wall time was 464.67 ms, including inter-slice delays.
+Retained Lua heap after collecting garbage grew about 18.55 MiB, including
+setup and the 50,000-line/100,000-bracket cache; this excludes Neovim C memory.
+A burst of 100 edits coalesced into one scanned line. Edits that alter nesting
+or multiline lexical state can require the remaining suffix to be scanned in
+background slices; huge replacements/bursts reset the cache.
+
+These are machine-specific headless observations, with no timing thresholds
+in CI. The independent embedded UI check in `./tests/run.sh` validates rendered
+RGB colors, cross-line edits, split windows, scrolling, toggling and teardown.
+It does not measure physical keyboard-to-screen latency.
+
+## Pairing input benchmark
+
 Run `./tests/bench.sh` from the checkout. It uses isolated XDG directories and
 does not modify installed Neovim state. Optional pinned grammars enable the
 parser scenarios:

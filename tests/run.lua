@@ -1170,6 +1170,8 @@ dofile("tests/fast_wrap_call.lua")({
   plugin = plugin,
 })
 
+dofile("tests/rainbow.lua")({ test = test, eq = eq, seed = seed, plugin = plugin })
+
 dofile("tests/surround.lua")({ test = test, eq = eq, seed = seed, feed = feed, plugin = plugin })
 
 plugin.teardown()

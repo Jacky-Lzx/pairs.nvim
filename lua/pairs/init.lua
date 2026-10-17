@@ -11,6 +11,7 @@ function M.setup(opts)
   require("pairs.surround").teardown()
   config, enabled = candidate, true
   mapping.attach(config, M.handle, M.fast_wrap)
+  require("pairs.rainbow").setup(config)
   require("pairs.surround").setup(config, function()
     return enabled
   end)
@@ -82,6 +83,7 @@ end
 
 function M.teardown()
   trace.stop()
+  require("pairs.rainbow").teardown()
   require("pairs.surround").teardown()
   require("pairs.mapping").detach()
   config = nil

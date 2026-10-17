@@ -2,8 +2,8 @@
 
 Conservative quote and bracket pairing for Neovim 0.11+. Pure Lua, no runtime
 dependencies. Supports matching-closer skipping, paired Backspace, indented
-Enter, optional space padding, fast wrap, optional surround editing, and
-syntax-aware language rules.
+Enter, optional space padding, fast wrap, optional surround editing, rainbow
+brackets, and syntax-aware language rules.
 
 ## Install
 
@@ -22,6 +22,8 @@ Disable other auto-pairs plugins. With lazy.nvim:
 
 For a local checkout, replace the repository name with `dir = "/path/to/pairs.nvim"`.
 Calling `setup()` installs mappings; requiring the module alone does not.
+Rainbow brackets start when the plugin loads. Use `event = { "BufReadPost", "BufNewFile" }`
+instead of `InsertEnter` to see colors before the first edit.
 
 ## Behavior
 
@@ -81,6 +83,47 @@ vim.b.pairs_multi_rules = { ["$$"] = false }
 
 New delimiter/Space mappings must be declared globally or for a filetype during
 setup, or composed explicitly. See `:help pairs-setup` for all options/defaults.
+
+### Rainbow brackets
+
+Enabled by default for `()`, `[]` and `{}`. Each nesting level cycles through
+seven colors; a matching closer uses its opener's color, including across lines.
+Unmatched closers keep their normal syntax color. This feature runs independently
+of automatic pairing, its rules, and the `treesitter` option.
+
+```lua
+require("pairs").setup({
+  rainbow = {
+    enabled = true, -- false disables the feature entirely
+    debounce_ms = 20,
+    budget_ms = 2,
+    -- Optional: replace the palette with existing highlight groups.
+    -- highlights = { "DiagnosticError", "DiagnosticWarn", "DiagnosticInfo" },
+  },
+})
+```
+
+Use `:PairsRainbowToggle` for the current buffer, or set
+`vim.b.pairs_rainbow = false`. Customize the default groups with `nvim_set_hl`:
+`PairsRainbowRed`, `Yellow`, `Blue`, `Orange`, `Green`, `Violet` and `Cyan`
+(each name starts with `PairsRainbow`). Color scheme changes restore defaults
+without replacing explicit overrides.
+
+The incremental lexer handles ordinary quoted strings, common line comments,
+Lua long strings/comments, Python triple strings, C-style block comments,
+Rust raw strings/nested comments, Go raw strings and JavaScript template
+expressions. It is a lexical highlighter: regex literals, JSX, embedded languages
+and other language-specific constructs can need a dedicated parser-based plugin.
+Markdown and plain text use literal bracket nesting.
+
+Work is debounced and split into background slices. Editing callbacks only
+invalidate the cache; redraw callbacks only paint cached visible lines with
+ephemeral highlights. Unchanged suffixes are reused after state convergence,
+including after inserting/deleting lines. Hidden buffers release their caches.
+Safety limits disable coloring for buffers above 100,000 lines, 2 MiB, 10,000
+bytes per line, 256 nesting levels or 100,000 bracket characters. At most 2,000
+brackets are painted per window per redraw. Limits are configurable; see
+`:help pairs-rainbow`. Pair insertion continues when a rainbow limit is reached.
 
 ### Space padding
 
@@ -260,6 +303,7 @@ elsewhere, e.g. `mappings.space = false` for Space. See `:help pairs-api` for
 ## Troubleshooting
 
 - `:PairsToggle` toggles pairing globally.
+- `:PairsRainbowToggle` toggles rainbow brackets in the current buffer.
 - `:PairsInspect {key}` explains insertion before the Normal-mode cursor;
   accepts `<BS>`, `<CR>`, `<Space>` and the logical action `<FastWrap>`.
 - `:checkhealth pairs` checks initialization and mapping conflicts.
@@ -290,8 +334,10 @@ stylua --check lua tests plugin
 PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers ./tests/run.sh
 
 ./tests/bench.sh
+./tests/bench-rainbow.sh
 ```
 
-Tests exercise real Neovim input, cursor positions, mappings and undo/redo/dot
-in isolated XDG directories. See [benchmark methods/results](docs/BENCHMARKS.md)
+Tests exercise real Neovim input, cursor positions, mappings and undo/redo/dot,
+plus rendered rainbow colors through an embedded Neovim UI, in isolated XDG
+directories. See [benchmark methods/results](docs/BENCHMARKS.md)
 and [implementation notes/roadmap](docs/PLAN.md) for development details.

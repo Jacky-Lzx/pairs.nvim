@@ -3,6 +3,10 @@ if vim.g.loaded_pairs_nvim then
 end
 vim.g.loaded_pairs_nvim = true
 
+vim.api.nvim_create_user_command("PairsRainbowToggle", function()
+  require("pairs.rainbow").toggle()
+end, { desc = "Toggle rainbow brackets in the current buffer" })
+
 vim.api.nvim_create_user_command("PairsToggle", function()
   require("pairs").toggle()
 end, { desc = "Toggle pairs.nvim" })

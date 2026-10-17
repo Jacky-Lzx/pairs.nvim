@@ -42,6 +42,27 @@ M.defaults = {
   max_scan_bytes = 4096,
   treesitter = false,
   surround = require("pairs.surround").defaults,
+  rainbow = {
+    enabled = true,
+    debounce_ms = 20,
+    budget_ms = 2,
+    max_lines = 100000,
+    max_bytes = 2 * 1024 * 1024,
+    max_line_bytes = 10000,
+    max_depth = 256,
+    max_brackets = 100000,
+    max_visible_brackets = 2000,
+    priority = 110,
+    highlights = {
+      "PairsRainbowRed",
+      "PairsRainbowYellow",
+      "PairsRainbowBlue",
+      "PairsRainbowOrange",
+      "PairsRainbowGreen",
+      "PairsRainbowViolet",
+      "PairsRainbowCyan",
+    },
+  },
   disabled_filetypes = { "TelescopePrompt", "snacks_picker_input" },
   multi_pairs = {},
   tex_environments = vim.deepcopy(require("pairs.tex_env").defaults),
@@ -188,6 +209,7 @@ function M.build(opts)
     "pairs: max_scan_bytes must be a positive integer"
   )
   assert(type(config.treesitter) == "boolean", "pairs: treesitter must be boolean")
+  require("pairs.rainbow").validate(config.rainbow)
   require("pairs.surround").validate(config.surround)
   assert(type(config.mappings) == "table", "pairs: mappings must be a table")
   for _, key in ipairs({ "enabled", "bs", "cr", "space" }) do

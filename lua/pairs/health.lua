@@ -37,6 +37,16 @@ function M.check()
     end
   end
   vim.health.info("Enter expansion is configurable; Tab is not mapped. See :help pairs-enter")
+  local rainbow = require("pairs.rainbow").status()
+  if rainbow.enabled then
+    if rainbow.reason then
+      vim.health.info("Rainbow brackets paused in this buffer: " .. rainbow.reason)
+    else
+      vim.health.info(
+        "Rainbow brackets enabled; incremental background scan, visible-line rendering"
+      )
+    end
+  end
 end
 
 return M
