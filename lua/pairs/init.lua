@@ -17,7 +17,7 @@ local function decide(key, opts)
     return { action = "pass", reason = "not_initialized" }
   end
   local ok, ctx =
-    pcall(require("pairs.context").capture, config, enabled, opts and opts.assume_insert)
+    pcall(require("pairs.context").capture, config, enabled, opts and opts.assume_insert, key)
   if not ok then
     return { action = "pass", reason = "context_error", error = tostring(ctx) }
   end

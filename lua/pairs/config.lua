@@ -2,6 +2,17 @@ local M = {}
 -- Only setup-owned metadata is shared. Buffer overrides are never cached.
 local prepared = setmetatable({}, { __mode = "k" })
 
+local function prepare_tex(environments)
+  local custom_literal = false
+  for name, mode in pairs(environments) do
+    if mode == "literal" and require("pairs.tex_env").protected[name] ~= "literal" then
+      custom_literal = true
+      break
+    end
+  end
+  return { environments = environments, custom_literal = custom_literal }
+end
+
 local function prepare(rules, multi_rules)
   local openers, closers, quotes = {}, {}, { ['"'] = true, ["'"] = true }
   local has_space = false
@@ -212,6 +223,7 @@ function M.build(opts)
   require("pairs.tex_env").validate(config.tex_environments)
   assert(type(config.filetypes) == "table", "pairs: filetypes must be a table")
   local metadata = { default = prepare(config.pairs, config.multi_pairs), filetypes = {} }
+  metadata.default.tex = prepare_tex(config.tex_environments)
   for ft, overrides in pairs(config.filetypes) do
     assert(type(ft) == "string" and type(overrides) == "table", "pairs: invalid filetype override")
     if overrides.tex_environments ~= nil then
@@ -222,17 +234,17 @@ function M.build(opts)
     local multi =
       vim.tbl_deep_extend("force", vim.deepcopy(config.multi_pairs), overrides.multi_pairs or {})
     validate_multi(multi)
-    require("pairs.tex_env").validate(
-      vim.tbl_deep_extend(
-        "force",
-        vim.deepcopy(config.tex_environments),
-        overrides.tex_environments or {}
-      )
+    local environments = vim.tbl_deep_extend(
+      "force",
+      vim.deepcopy(config.tex_environments),
+      overrides.tex_environments or {}
     )
+    require("pairs.tex_env").validate(environments)
     if overrides.enabled ~= nil then
       assert(type(overrides.enabled) == "boolean", "pairs: filetype enabled must be boolean")
     end
     metadata.filetypes[ft] = prepare(rules, multi)
+    metadata.filetypes[ft].tex = prepare_tex(environments)
   end
   prepared[config] = metadata
   return config
@@ -280,6 +292,14 @@ function M.resolve_tex(config, ft, buffer)
   )
   require("pairs.tex_env").validate(environments)
   return environments
+end
+
+function M.capture_tex(config, ft, buffer)
+  if buffer ~= nil then
+    return prepare_tex(M.resolve_tex(config, ft, buffer))
+  end
+  local metadata = assert(prepared[config], "pairs: configuration was not built")
+  return (metadata.filetypes[ft] or metadata.default).tex
 end
 
 return M

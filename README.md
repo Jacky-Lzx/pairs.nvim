@@ -432,7 +432,9 @@ is written, including file-end blank lines. Partial headers, mismatched scopes
 and unprovable recovery preserve input. Each prefix traversal is limited to 256
 syntax nodes and excludes future content. Declaring custom raw modes also checks
 preceding scope metadata, so unresolved/over-budget prefixes keep all pairing
-keys native. No full buffer-text scan, synchronous parse or highlighting setup
+keys native. Ancestor walks stop after 256 nodes; header-field lookups inspect
+at most 16 children, while environment boundaries use their first/last nodes.
+No full buffer-text scan, synchronous parse or highlighting setup
 is requested.
 
 VimTeX indentation, existing mappings, completion and snippet expansion keep
@@ -805,7 +807,10 @@ integration remains a separate manual acceptance check.
 
 The benchmark reports decision median/P95/max in microseconds and separately
 times input batches that edit buffers through the actual mappings. It also checks
-the resulting text, undo/redo and dot repeat. `PAIRS_BENCH_SAMPLES` defaults to
+the resulting text, undo/redo and dot repeat. LaTeX cases include complete and
+unfinished documents from 1,000 lines up to `PAIRS_BENCH_LINES`, command
+arguments, many raw spans, real edits and mapped
+math delimiters. `PAIRS_BENCH_SAMPLES` defaults to
 1000; `PAIRS_BENCH_LINES` to 50000; `PAIRS_BENCH_MAPPED_SAMPLES` to 20.
 Use `PAIRS_BENCH_PROFILE=1` for an additional instrumented stage breakdown.
 No parser fixtures are required for the lexer and mapped-input cases.

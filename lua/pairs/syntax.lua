@@ -278,7 +278,7 @@ local function code_prefix(root, text, row, col, start)
   return masked
 end
 
-function M.capture(buf, row, col, text, environments)
+function M.capture(buf, row, col, text, environments, custom_literal)
   -- These filetypes are not registered as aliases in a bare Neovim runtime.
   -- Respect an explicit language registration before using standard aliases.
   local ft = vim.bo[buf].filetype
@@ -313,7 +313,15 @@ function M.capture(buf, row, col, text, environments)
   if parser:lang() == "latex" then
     local outer = parser:tree_for_range(range)
     if outer then
-      tex = require("pairs.tex_syntax").capture(outer:root(), row, col, text, buf, environments)
+      tex = require("pairs.tex_syntax").capture(
+        outer:root(),
+        row,
+        col,
+        text,
+        buf,
+        environments,
+        custom_literal
+      )
     end
   end
   local function with_context(context)

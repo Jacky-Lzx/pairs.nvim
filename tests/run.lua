@@ -1091,6 +1091,14 @@ dofile("tests/performance.lua")({
   plugin = plugin,
 })
 
+dofile("tests/performance_tex.lua")({
+  test = test,
+  input = input,
+  seed = seed,
+  eq = eq,
+  plugin = plugin,
+})
+
 dofile("tests/trace.lua")({
   test = test,
   seed = seed,

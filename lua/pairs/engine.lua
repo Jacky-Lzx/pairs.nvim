@@ -17,6 +17,9 @@ function M.decide(ctx, key)
   if not ctx.enabled then
     return decision("pass", ctx.disabled_reason or "disabled")
   end
+  if ctx.pass_reason then
+    return decision("pass", ctx.pass_reason)
+  end
   local tex = require("pairs.tex").decide(ctx, key)
   if tex then
     return tex

@@ -1,5 +1,6 @@
 -- Command argument recovery uses current syntax anchors and a bounded prefix.
 local M = {}
+local nodes = require("pairs.tex_node")
 local profiles = {
   section = { option = "text", "text" },
   subsection = { option = "text", "text" },
@@ -37,7 +38,11 @@ local function before(ar, ac, br, bc)
   return ar < br or (ar == br and ac < bc)
 end
 local function command(node, buf)
-  local token = node:field("command")[1]
+  local kind = node:type()
+  if kind == "source_file" or kind:match("_environment$") then
+    return nil
+  end
+  local token = nodes.field(node, "command")
   if token then
     local sr, sc, er, ec = token:range()
     if sr == er and ec - sc <= 64 then
@@ -64,7 +69,12 @@ local function anchor(root, row, col, buf)
     node = previous_child(root, row, col) or node
   end
   local branch, first
+  local visited = 0
   while node do
+    visited = visited + 1
+    if visited > 256 then
+      return nil
+    end
     local kind = node:type()
     local sr, sc, er, ec = node:range()
     local unfinished = node:has_error() and not before(row, col, sr, sc)
@@ -226,22 +236,28 @@ function M.capture(root, row, col, line, buf)
     result.start_row, result.start_col = sr, sc
     result.close = result.close == line:sub(col + 1, col + 1) and result.close or nil
     local offset = #text - col
-    local masked = line
-    for _, span in ipairs(result.spans or {}) do
-      local first_col, last_col = math.max(0, span[1] - offset), math.min(col, span[2] - offset - 1)
-      if first_col < last_col then
-        masked = masked:sub(1, first_col)
-          .. string.rep(" ", last_col - first_col)
-          .. masked:sub(last_col + 1)
+    local fragments, last_col = {}, 0
+    local position_row, line_start, column_base = sr, 1, sc
+    local newline = text:find("\n", 1, true)
+    local function position(index)
+      while newline and newline < index do
+        position_row, line_start, column_base = position_row + 1, newline + 1, 0
+        newline = text:find("\n", line_start, true)
       end
-      local function position(index)
-        local prefix = text:sub(1, index - 1)
-        local _, count = prefix:gsub("\n", "")
-        return sr + count, count == 0 and sc + #prefix or #(prefix:match("[^\n]*$") or "")
+      return position_row, column_base + index - line_start
+    end
+    for _, span in ipairs(result.spans or {}) do
+      local first_col, end_col = math.max(0, span[1] - offset), math.min(col, span[2] - offset - 1)
+      if first_col < end_col then
+        fragments[#fragments + 1] = line:sub(last_col + 1, first_col)
+        fragments[#fragments + 1] = string.rep(" ", end_col - first_col)
+        last_col = end_col
       end
       span.start_row, span.start_col = position(span[1] + 1)
       span.end_row, span.end_col = position(span[2])
     end
+    fragments[#fragments + 1] = line:sub(last_col + 1)
+    local masked = table.concat(fragments)
     result.lex_line = masked ~= line and masked or nil
   end
   return result

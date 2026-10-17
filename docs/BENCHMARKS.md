@@ -67,6 +67,58 @@ Neither metric measures physical keyboard-to-screen latency: these are headless
 runs without UI rendering, real completion/LSP responses or OS event delivery.
 CI uses small fixtures and asserts behavior without timing thresholds.
 
+LaTeX scenarios live in `tests/bench_tex.lua`; its contents are included in the
+benchmark fingerprint. They use current parser trees for ordinary text, proof
+environments, URLs, long command arguments and 300 completed raw spans. Complete
+and unfinished documents cover 1,000 lines, up to 10,000 lines, and
+`PAIRS_BENCH_LINES` (duplicate sizes are omitted). The unfinished cases verify
+conservative pass-through after the bounded recovery budget is exhausted. Real
+edits have a separate 30-sample first-decision measurement. Parser settling tests
+the same requested range as production, rather than requiring unrelated document
+ranges to become valid. Mapped inline/display formulas also verify text and
+undo/redo/dot behavior.
+
+## LaTeX comparison: 2026-10-17
+
+Baseline: an archive of `41084d1`. The optimized runtime bounds field lookup by
+child count, reads environment edges directly, prepares static environment
+metadata at setup, and builds raw-span masks/positions in one forward pass.
+Ordinary TeX backslashes and non-pair Backspace also avoid parser capture.
+
+Both runtimes ran the identical current benchmark sequentially on Apple M5 Pro,
+macOS arm64, Neovim 0.12.6, with the same locally installed parser binaries.
+This is one paired run with 100 decision samples, 50,000 large-file lines, and
+5 mapped samples; normal warmup/GC rules above apply. The real-edit TeX cases
+use 30 samples. Values are observations from this machine, not CI thresholds.
+
+| Decision (microseconds) | Before median | After median | Before P95 | After P95 |
+| --- | ---: | ---: | ---: | ---: |
+| Inline math opening, current tree | 13.67 | 8.62 | 22.88 | 16.92 |
+| 300 raw spans in one text argument | 2993.83 | 223.17 | 3441.25 | 796.67 |
+| 1,000-line document, current tree | 1378.92 | 19.17 | 1508.88 | 39.83 |
+| 10,000-line document, current tree | 17840.17 | 44.04 | 18375.17 | 135.38 |
+| 50,000-line document, current tree | 106646.54 | 30.38 | 107894.25 | 68.08 |
+| 50,000-line unfinished document | 253.00 | 289.71 | 278.00 | 376.92 |
+| 50,000-line document, first decision after edit | 3052.21 | 3053.21 | 3081.71 | 3112.12 |
+
+The prepared-tree cost no longer follows the enclosing document's child count.
+Unfinished documents still hit bounded conservative recovery, and that case is
+slightly slower in this run. Real after-edit decisions still spend about 3 ms
+in the first parser time slice; they may pass the key through while parsing is
+pending. The measurements do not establish keyboard-to-screen latency.
+
+Comparison fingerprints:
+
+```text
+before runtime 628d345eb90279e7f5c30dccb9350a3c63d65abc8fca99d440a607a30c433b6f
+after runtime  f3e27a0609c980b17ab838c4d5b313c7ca26c21350b373f547970cc65e798283
+benchmark      b958810b93abd18cb472c04a0346495f04da47fb50aacd9ee183fed7d24c48e5
+```
+
+To compare another revision, copy both `tests/bench.lua` and
+`tests/bench_tex.lua`, plus `tests/bench.sh`, into each archived runtime. Preserve
+the benchmark fingerprint and parser binaries across runs.
+
 ## Measured comparison: 2026-10-01
 
 Baseline: `c58fb978cab23aef254e585c6e8884ba4faae45d`. Optimized runtime:

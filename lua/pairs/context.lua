@@ -24,7 +24,28 @@ local comments = {
   cs = { "//" },
 }
 
-function M.capture(config, global_enabled, assume_insert)
+local function tex_pass_reason(ctx, key)
+  if key == "\\" and not ctx.rules[key] and not ctx.lex.closers[key] then
+    local following = ctx.line:sub(ctx.col + 1, ctx.col + 2)
+    if following ~= "\\)" and following ~= "\\]" then
+      return "literal_backslash"
+    end
+  elseif key == "<BS>" then
+    local previous = ctx.line:sub(ctx.col, ctx.col)
+    if
+      previous ~= ""
+      and not previous:match("%s")
+      and not ctx.rules[previous]
+      and previous ~= "$"
+      and previous ~= "("
+      and previous ~= "["
+    then
+      return "not_empty_pair"
+    end
+  end
+end
+
+function M.capture(config, global_enabled, assume_insert, key)
   local buf = vim.api.nvim_get_current_buf()
   local cursor = vim.api.nvim_win_get_cursor(0)
   local ft = vim.bo[buf].filetype
@@ -86,13 +107,23 @@ function M.capture(config, global_enabled, assume_insert)
     },
   }
   if enabled and config.treesitter and #ctx.line <= config.max_scan_bytes then
-    local environments
+    local environments, custom_literal
     if ft == "tex" or ft == "plaintex" then
-      environments =
-        require("pairs.config").resolve_tex(config, ft, vim.b[buf].pairs_tex_environments)
+      local tex = require("pairs.config").capture_tex(config, ft, vim.b[buf].pairs_tex_environments)
+      environments, custom_literal = tex.environments, tex.custom_literal
+      ctx.pass_reason = tex_pass_reason(ctx, key)
     end
-    local syntax =
-      require("pairs.syntax").capture(buf, cursor[1] - 1, cursor[2], ctx.line, environments)
+    if ctx.pass_reason then
+      return ctx -- These keys cannot edit a pair, regardless of parser state.
+    end
+    local syntax = require("pairs.syntax").capture(
+      buf,
+      cursor[1] - 1,
+      cursor[2],
+      ctx.line,
+      environments,
+      custom_literal
+    )
     for key, value in pairs(syntax) do
       ctx[key] = value
     end

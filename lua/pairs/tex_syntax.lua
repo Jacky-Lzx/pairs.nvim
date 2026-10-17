@@ -1,5 +1,6 @@
 -- Extract math boundaries from the current outer LaTeX tree.
 local lex = require("pairs.lex")
+local nodes = require("pairs.tex_node")
 local M = {}
 local literal = {
   verbatim_environment = true,
@@ -38,7 +39,7 @@ local function short_text(node, buf)
 end
 
 local function environment_name(begin, buf)
-  local text = begin and short_text(begin:field("name")[1], buf)
+  local text = begin and short_text(nodes.field(begin, "name"), buf)
   return text and text:match("^%{([%w_.:%*%-]+)%}$") or nil
 end
 
@@ -104,9 +105,9 @@ local function recovery_prefix(parent, leaf, buf, environments, row, col, argume
     elseif kind == "end" then
       return ending(child)
     elseif kind == "generic_command" then
-      local command = short_text(child:field("command")[1], buf)
+      local command = short_text(nodes.field(child, "command"), buf)
       if command == "\\begin" or command == "\\end" then
-        local name = short_text(child:field("arg")[1], buf)
+        local name = short_text(nodes.field(child, "arg"), buf)
         name = name and name:match("^%{([%w_.:%*%-]+)%}$")
         if command == "\\end" then
           local active = stack[#stack]
@@ -131,7 +132,7 @@ local function recovery_prefix(parent, leaf, buf, environments, row, col, argume
       return raw or (command ~= nil and not child:has_error())
     end
     if not raw and kind:match("_environment$") and not child:has_error() then
-      local begin, finish = child:field("begin")[1], child:field("end")[1]
+      local begin, finish = nodes.environment(child)
       if finish and environment_name(begin, buf) == environment_name(finish, buf) then
         return true -- A complete sibling is no longer an active scope.
       end
@@ -157,7 +158,7 @@ local function recovery_prefix(parent, leaf, buf, environments, row, col, argume
     local is_end = child:type() == "end"
       or (
         child:type() == "generic_command"
-        and short_text(child:field("command")[1], buf) == "\\end"
+        and short_text(nodes.field(child, "command"), buf) == "\\end"
       )
     local finished_end = is_end and (er < row or (er == row and ec <= col))
     if (at_target and not finished_end) or sr > row or (sr == row and sc >= col) then
@@ -202,13 +203,15 @@ local function inline_literal(text, col)
   return false
 end
 
-function M.capture(root, row, col, text, buf, environments)
+function M.capture(root, row, col, text, buf, environments, custom_literal)
   environments = environments or require("pairs.tex_env").defaults
-  local custom_literal = false
-  for name, mode in pairs(environments) do
-    if mode == "literal" and require("pairs.tex_env").protected[name] ~= "literal" then
-      custom_literal = true
-      break
+  if custom_literal == nil then
+    custom_literal = false
+    for name, mode in pairs(environments) do
+      if mode == "literal" and require("pairs.tex_env").protected[name] ~= "literal" then
+        custom_literal = true
+        break
+      end
     end
   end
   local result = { upgrade = false }
@@ -240,8 +243,12 @@ function M.capture(root, row, col, text, buf, environments)
     end
   end
   local node, formula, branch, region, uncertain = leaf, nil, nil, "text", false
-  local outer_literal = false
+  local outer_literal, visited = false, 0
   while node do
+    visited = visited + 1
+    if visited > 256 then
+      return { blocked = true, uncertain = true, region = "unknown" }
+    end
     local kind = node:type()
     local br, bc, nr, nc = node:range()
     local inside = row < nr
@@ -280,7 +287,7 @@ function M.capture(root, row, col, text, buf, environments)
       end
     end
     if kind:match("_environment$") then
-      local begin, ending = node:field("begin")[1], node:field("end")[1]
+      local begin, ending = nodes.environment(node)
       local er, ec
       if ending then
         er, ec = ending:end_()

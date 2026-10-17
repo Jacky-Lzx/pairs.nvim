@@ -36,7 +36,11 @@ local report = {
   uncommitted_changes = dirty,
   -- Encode NUL separators: Neovim 0.11 treats a Lua NUL string as a Vim Blob.
   source_sha256 = vim.fn.sha256(vim.json.encode(source)),
-  benchmark_sha256 = vim.fn.sha256(table.concat(vim.fn.readfile("tests/bench.lua", "b"), "\n")),
+  benchmark_sha256 = vim.fn.sha256(
+    table.concat(vim.fn.readfile("tests/bench.lua", "b"), "\n")
+      .. "\n"
+      .. table.concat(vim.fn.readfile("tests/bench_tex.lua", "b"), "\n")
+  ),
   decisions = {},
   mapped = {},
 }
@@ -64,6 +68,7 @@ local function reset(lines, row, col, ft, opts)
   vim.bo.cindent, vim.bo.smartindent = false, false
   vim.bo.shiftwidth, vim.bo.expandtab = 2, true
   vim.b.pairs_rules, vim.b.pairs_multi_rules, vim.b.pairs_enabled = nil, nil, nil
+  vim.b.pairs_tex_environments = nil
   vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
   vim.api.nvim_win_set_cursor(0, { row, col })
   assert(vim.api.nvim_win_get_cursor(0)[2] == col, "benchmark insertion cursor was clamped")
@@ -71,10 +76,12 @@ local function reset(lines, row, col, ft, opts)
 end
 local function profile(key, expected)
   local modules = {
-    config = { "resolve", "resolve_multi", "capture" },
+    config = { "resolve", "resolve_multi", "capture", "capture_tex", "resolve_tex" },
     context = { "capture" },
     lex = { "scan" },
     syntax = { "capture" },
+    tex_syntax = { "capture" },
+    tex_args = { "capture" },
   }
   local originals, stages = {}, {}
   for module, names in pairs(modules) do
@@ -454,9 +461,11 @@ if vim.env.PAIRS_TEST_PARSER_ROOT then
       vim.api.nvim_win_set_cursor(0, { middle, #line })
     end,
     after = function()
+      local col = vim.api.nvim_win_get_cursor(0)[2]
+      local range = { middle - 1, col - 1, middle - 1, col - 1 }
       assert(
         vim.wait(2000, function()
-          return parser:is_valid(false)
+          return parser:is_valid(false, range)
         end, 1),
         "asynchronous parser did not settle"
       )
@@ -466,11 +475,18 @@ end
 for _, case in ipairs(cases) do
   decision(case)
 end
+if vim.env.PAIRS_TEST_PARSER_ROOT then
+  dofile("tests/bench_tex.lua")({
+    decision = decision,
+    large_lines = large_lines,
+    samples = samples,
+  })
+end
 local function feed(keys)
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, true, true), "xt", false)
 end
-local function mapped(name, keys, expected, native, owned_keys, opts)
-  reset({ "" }, 1, 0, "lua", opts or {})
+local function mapped(name, keys, expected, native, owned_keys, opts, ft)
+  reset({ "" }, 1, 0, ft or "lua", opts or {})
   if native then
     plugin.teardown()
   end
@@ -614,6 +630,14 @@ mapped(
   padding_opts
 )
 plugin.teardown()
+if vim.env.PAIRS_TEST_PARSER_ROOT then
+  local tex_opts = {
+    treesitter = true,
+    multi_pairs = { ["$$"] = {}, ["\\("] = {}, ["\\["] = {} },
+  }
+  mapped("mapped-tex-inline", "\\(x\\)", { "\\(x\\)" }, false, 4, tex_opts, "tex")
+  mapped("mapped-tex-display", "\\[<CR>x", { "\\[", "x", "\\]" }, false, 3, tex_opts, "tex")
+end
 print(
   "pairs.nvim benchmark: " .. tostring(vim.version()) .. ", " .. large_lines .. " large-file lines"
 )
