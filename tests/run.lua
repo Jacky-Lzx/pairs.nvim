@@ -974,6 +974,54 @@ test("private alias collision preserves the owner", function()
   vim.keymap.del("i", plug)
 end)
 
+test("mapping conflicts refresh after replacement and removal", function()
+  local entry = seed("│")
+  local opts = { pairs = { ["("] = { space = true } } }
+  plugin.setup(opts)
+  vim.keymap.set("i", "<Space>", "foreign")
+  plugin.setup(opts)
+  eq(plugin.status().conflicts, { "<Space>" })
+  feed(entry .. "<Space><Cmd>lua pairs_test_capture()<CR><Esc>")
+  eq(_G.pairs_test_result, "foreign│")
+  vim.keymap.del("i", "<Space>")
+  plugin.setup(opts)
+  eq(plugin.status().conflicts, {})
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, { "" })
+  feed("i( <Cmd>lua pairs_test_capture()<CR><Esc>")
+  eq(_G.pairs_test_result, "( │ )")
+end)
+
+test("teardown preserves a replaced private callback", function()
+  seed("│")
+  plugin.setup()
+  local plug = "<Plug>(pairs.nvim-34)"
+  local replacement = function()
+    return "foreign"
+  end
+  vim.keymap.set("i", plug, replacement, { expr = true })
+  plugin.teardown()
+  eq(vim.fn.maparg(plug, "i", false, true).callback, replacement)
+  eq(vim.fn.maparg('"', "i"), "")
+  vim.keymap.del("i", plug)
+end)
+
+test("filetype-only rules install mappings before switching filetypes", function()
+  local entry = seed("│", "lua")
+  plugin.setup({
+    pairs = { ["("] = false },
+    filetypes = {
+      lua = { pairs = { ["("] = { close = ")" } } },
+      markdown = { multi_pairs = { ["**"] = {} } },
+    },
+  })
+  feed(entry .. "(<Cmd>lua pairs_test_capture()<CR><Esc>")
+  eq(_G.pairs_test_result, "(│)")
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, { "" })
+  vim.bo.filetype = "markdown"
+  feed("i**<Cmd>lua pairs_test_capture()<CR><Esc>")
+  eq(_G.pairs_test_result, "**│**")
+end)
+
 test("globally disabled quote survives partial filetype policies", function()
   input("│", "'", "'│", { pairs = { ["'"] = false } }, "markdown")
 end)

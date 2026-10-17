@@ -1,5 +1,35 @@
 # Input benchmark
 
+## Plugin loading: 2026-10-18
+
+Mapping installation and teardown now take one fresh mapping snapshot per mode
+and index it by normalized keycodes. Each snapshot lives only for that synchronous
+operation, so later user replacements are still checked before removal. Mapping
+registration also reads the filetype rules already validated by `config.build`.
+
+A local comparison against `5f3b311` on macOS 26.6.2 arm64, Neovim 0.12.6,
+alternated the original and optimized implementations in fresh processes: three
+warmup launches per variant, then 30 measured launches with warm bytecode caches.
+The development configuration enables surround, rainbow brackets, Tree-sitter,
+and 12 filetype policies. Median synchronous loading times in milliseconds:
+
+- Standalone, default options: 2.222 -> 1.875.
+- Standalone, development configuration options: 6.563 -> 3.556.
+- Full configuration, first InsertEnter: 15.537 -> 4.140.
+- Full configuration, opening Lua: 13.437 -> 3.656.
+- Full configuration, opening TeX: 13.376 -> 3.650.
+- Full configuration, opening C++: 13.532 -> 3.759.
+
+InsertEnter P95 fell from 16.458 to 5.803 ms. Full-configuration launches used
+a real terminal UI and Lazy's plugin load timer, with isolated cache/state,
+automatic installation disabled, and external LSP/WakaTime startup suppressed.
+Standalone timing includes the runtime plugin script, `require("pairs")`, and
+`setup`; reading the options is outside that timer. These measurements exclude
+later asynchronous rainbow scanning and do not measure total editor startup or
+keyboard-to-screen latency. Dashboard startup still leaves the plugin unloaded.
+Mapping counts and conflicts matched the original in every measured scenario.
+These are local observations, not portable timing guarantees or CI thresholds.
+
 ## Rainbow brackets: 2026-10-18
 
 Run `./tests/bench-rainbow.sh` with isolated XDG directories. Options are

@@ -4,23 +4,19 @@ local function keycode(key)
   return vim.api.nvim_replace_termcodes(key, true, true, true)
 end
 
-local function global_mapping(lhs)
-  for _, mapping in ipairs(vim.api.nvim_get_keymap("i")) do
-    if keycode(mapping.lhs) == keycode(lhs) then
-      return mapping
-    end
-  end
-end
-
 function M.detach()
+  local mappings = #M.owned > 0 and require("pairs.keymap").snapshot("i") or {}
   for _, owned in ipairs(M.owned) do
-    local current = global_mapping(owned.lhs)
+    local lhs, plug = keycode(owned.lhs), keycode(owned.plug)
+    local current = mappings[lhs]
     if current and current.rhs == owned.rhs then
       vim.keymap.del("i", owned.lhs)
+      mappings[lhs] = nil
     end
-    local inner = global_mapping(owned.plug)
+    local inner = mappings[plug]
     if inner and inner.callback == owned.callback then
       vim.keymap.del("i", owned.plug)
+      mappings[plug] = nil
     end
   end
   M.owned, M.conflicts = {}, {}
@@ -30,6 +26,7 @@ function M.attach(config, handler, fast_wrap)
   if not config.mappings.enabled then
     return
   end
+  local mappings = require("pairs.keymap").snapshot("i")
   local keys = {}
   local function register(rules)
     for open, rule in pairs(rules) do
@@ -61,9 +58,11 @@ function M.attach(config, handler, fast_wrap)
     end
   end
   register_multi(config.multi_pairs)
+  local prepared = require("pairs.config")
   for ft in pairs(config.filetypes) do
-    register(require("pairs.config").resolve(config, ft))
-    register_multi(require("pairs.config").resolve_multi(config, ft))
+    local resolved = prepared.capture(config, ft)
+    register(resolved.rules)
+    register_multi(resolved.multi_rules)
   end
   if config.mappings.bs then
     keys["<BS>"] = true
@@ -78,7 +77,8 @@ function M.attach(config, handler, fast_wrap)
     local lhs = key == " " and "<Space>" or key
     local bytes = { lhs:byte(1, #lhs) }
     local plug = "<Plug>(pairs.nvim-" .. table.concat(bytes, "-") .. ")"
-    if global_mapping(lhs) or global_mapping(plug) then
+    local lhs_code, plug_code = keycode(lhs), keycode(plug)
+    if mappings[lhs_code] or mappings[plug_code] then
       M.conflicts[#M.conflicts + 1] = lhs
     else
       local callback = function()
@@ -97,6 +97,8 @@ function M.attach(config, handler, fast_wrap)
       -- Ignore flushes that text before the private expression is evaluated.
       local rhs = "<Ignore>" .. plug
       vim.keymap.set("i", lhs, rhs, { silent = true, desc = "pairs.nvim " .. lhs })
+      mappings[lhs_code] = { rhs = rhs }
+      mappings[plug_code] = { callback = callback }
       M.owned[#M.owned + 1] = { lhs = lhs, plug = plug, rhs = rhs, callback = callback }
     end
   end

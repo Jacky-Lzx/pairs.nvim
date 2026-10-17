@@ -713,16 +713,17 @@ function M.action(action, method, count)
   end
 end
 
-local function install(mode, lhs, callback, expr, label)
+local function install(mappings, mode, lhs, callback, expr, label)
   if lhs == "" then
     return false
   end
   local canonical = vim.api.nvim_replace_termcodes(lhs, true, true, true)
-  for _, mapping in ipairs(vim.api.nvim_get_keymap(mode)) do
-    if vim.api.nvim_replace_termcodes(mapping.lhs, true, true, true) == canonical then
-      conflicts[#conflicts + 1] = mode .. ":" .. lhs
-      return false
-    end
+  if not mappings[mode] then
+    mappings[mode] = require("pairs.keymap").snapshot(mode)
+  end
+  if mappings[mode][canonical] then
+    conflicts[#conflicts + 1] = mode .. ":" .. lhs
+    return false
   end
   vim.keymap.set(
     mode,
@@ -730,6 +731,7 @@ local function install(mode, lhs, callback, expr, label)
     callback,
     { expr = expr, silent = true, desc = "pairs.nvim surround " .. label }
   )
+  mappings[mode][canonical] = { callback = callback }
   owned[#owned + 1] = { mode = mode, lhs = lhs, callback = callback }
   return true
 end
@@ -744,6 +746,7 @@ function M.setup(candidate, enabled)
   if not active or not config.mappings.enabled then
     return
   end
+  local mappings = {}
   local maps = config.surround.mappings
   for _, action in ipairs({
     "add",
@@ -757,13 +760,13 @@ function M.setup(candidate, enabled)
     local operator = action == "add" or action == "delete" or action == "replace"
     local function register(lhs, method)
       local plug = "<Plug>(pairs-surround-" .. action .. (method and "-" .. method or "") .. ")"
-      local ok = install("n", plug, operator and function()
+      local ok = install(mappings, "n", plug, operator and function()
         return M.start(action, method)
       end or function()
         M.action(action, method)
       end, operator, action)
       if ok then
-        install("n", lhs, plug, false, action)
+        install(mappings, "n", lhs, plug, false, action)
       end
       if action == "find" or action == "find_left" then
         for _, mode in ipairs({ "x", "o" }) do
@@ -773,11 +776,11 @@ function M.setup(candidate, enabled)
             .. (method and "'" .. method .. "'" or "nil")
             .. ","
           if
-            install(mode, plug, function()
+            install(mappings, mode, plug, function()
               return command .. vim.v.count1 .. ")<CR>"
             end, true, action)
           then
-            install(mode, lhs, plug, false, action)
+            install(mappings, mode, lhs, plug, false, action)
           end
         end
       end
@@ -785,8 +788,8 @@ function M.setup(candidate, enabled)
     register(maps[action])
     if action == "add" then
       local plug = "<Plug>(pairs-surround-add)"
-      if install("x", plug, M.prepare_visual, true, action) then
-        install("x", maps.add, plug, false, action)
+      if install(mappings, "x", plug, M.prepare_visual, true, action) then
+        install(mappings, "x", maps.add, plug, false, action)
       end
     elseif action ~= "update_n_lines" and maps[action] ~= "" then
       if maps.suffix_last ~= "" then
@@ -800,23 +803,27 @@ function M.setup(candidate, enabled)
 end
 
 function M.teardown()
+  local mappings = {}
   for _, item in ipairs(owned) do
-    for _, mapping in ipairs(vim.api.nvim_get_keymap(item.mode)) do
-      if
-        vim.api.nvim_replace_termcodes(mapping.lhs, true, true, true)
-          == vim.api.nvim_replace_termcodes(item.lhs, true, true, true)
-        and (
-          mapping.callback == item.callback
-          or (
-            type(item.callback) == "string"
-            and mapping.rhs
-            and vim.api.nvim_replace_termcodes(mapping.rhs, true, true, true)
-              == vim.api.nvim_replace_termcodes(item.callback, true, true, true)
-          )
+    if not mappings[item.mode] then
+      mappings[item.mode] = require("pairs.keymap").snapshot(item.mode)
+    end
+    local canonical = vim.api.nvim_replace_termcodes(item.lhs, true, true, true)
+    local mapping = mappings[item.mode][canonical]
+    if
+      mapping
+      and (
+        mapping.callback == item.callback
+        or (
+          type(item.callback) == "string"
+          and mapping.rhs
+          and vim.api.nvim_replace_termcodes(mapping.rhs, true, true, true)
+            == vim.api.nvim_replace_termcodes(item.callback, true, true, true)
         )
-      then
-        vim.keymap.del(item.mode, item.lhs)
-      end
+      )
+    then
+      vim.keymap.del(item.mode, item.lhs)
+      mappings[item.mode][canonical] = nil
     end
   end
   if vim.o.operatorfunc == operator_name then
