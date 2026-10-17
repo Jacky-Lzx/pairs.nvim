@@ -121,6 +121,15 @@ local function options()
     (config.filetypes[ft] or {}).surround or {},
     vim.b.pairs_surround_config or {}
   )
+  local multi = require("pairs.config").resolve_multi(config, ft, vim.b.pairs_multi_rules)
+  for open, rule in pairs(multi) do
+    if rule ~= false and rule.surround and opts.custom_surroundings[rule.surround] == nil then
+      opts.custom_surroundings[rule.surround] = {
+        input = { left = open, right = rule.close },
+        output = { left = open, right = rule.close },
+      }
+    end
+  end
   M.validate(opts)
   if
     not opts.enabled
@@ -203,7 +212,11 @@ local function specification(id, part, opts)
       part == "output" or (#value.left > 0 and #value.right > 0),
       "pairs: empty surround search delimiter"
     )
-    return vim.deepcopy(value)
+    value = vim.deepcopy(value)
+    if part == "input" then
+      value.literal = true
+    end
+    return value
   end
   if brackets[id] then
     local left, right = opening[id] and id or brackets[id], opening[id] and brackets[id] or id
@@ -364,7 +377,7 @@ local function find(spec, opts, method, count)
       value = spec.matcher(context)
     end
     candidates = callback_regions(value, context)
-  elseif opts.treesitter then
+  elseif opts.treesitter and not spec.literal then
     local reason
     candidates, reason = require("pairs.surround_syntax").candidates(context, spec)
     if reason == "missing_parser" then

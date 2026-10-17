@@ -50,6 +50,9 @@ local function rules_copy(rules, single)
       if single then
         copy[open].skip_space = rule.skip_space
         copy[open].wrap = rule.wrap
+      else
+        copy[open].contexts = rule.contexts and vim.deepcopy(rule.contexts) or nil
+        copy[open].surround = rule.surround
       end
     end
   end
@@ -113,6 +116,8 @@ function M.record(key, result, ctx, config)
     "prefix",
     "error",
     "trim_space",
+    "clear_comment_leaders",
+    "delete_after",
   }) do
     local value = result[name]
     if type(value) == "string" then
@@ -151,6 +156,13 @@ function M.record(key, result, ctx, config)
   if config and type(config.enabled) == "function" then
     limitations[#limitations + 1] =
       "The enabled callback is not serialized; only its observed effect is captured."
+  end
+  for _, rule in pairs(ctx and ctx.multi_rules or {}) do
+    if rule ~= false and rule.condition then
+      limitations[#limitations + 1] =
+        "Custom multi-pair conditions are not serialized; add them to the reproduction configuration."
+      break
+    end
   end
   sequence = sequence + 1
   local entry = {

@@ -97,6 +97,8 @@ function M.capture(config, global_enabled, assume_insert, key)
     has_space = resolved.has_space,
     multi_rules = multi_rules,
     row = cursor[1] - 1,
+    generic_rules = multi_buffer and require("pairs.generic").prepare(multi_rules)
+      or resolved.generic,
     lex = {
       max_scan_bytes = config.max_scan_bytes,
       line_comments = comments[ft] or {},
@@ -106,12 +108,42 @@ function M.capture(config, global_enabled, assume_insert, key)
       rust = ft == "rust",
     },
   }
+  if enabled and ctx.generic_rules.keys[key] then
+    -- Include up to 32 preceding lines, bounded by the existing byte budget.
+    -- This snapshot lets pure decisions prove a closer after Enter expansion.
+    local last, first = cursor[1], math.max(0, cursor[1] - 32)
+    local finish = vim.api.nvim_buf_get_offset(buf, last)
+    local lo, hi = first, last - 1
+    while lo < hi do
+      local mid = math.floor((lo + hi) / 2)
+      if finish - vim.api.nvim_buf_get_offset(buf, mid) > config.max_scan_bytes then
+        lo = mid + 1
+      else
+        hi = mid
+      end
+    end
+    first = lo
+    if finish - vim.api.nvim_buf_get_offset(buf, first) <= config.max_scan_bytes then
+      local lines = vim.api.nvim_buf_get_lines(buf, first, last, false)
+      local starts, bytes = {}, 0
+      for i, line in ipairs(lines) do
+        starts[i], bytes = bytes, bytes + #line + 1
+      end
+      ctx.generic_window = {
+        text = table.concat(lines, "\n"),
+        lines = lines,
+        starts = starts,
+        first_row = first,
+        col = starts[#lines] + ctx.col,
+      }
+    end
+  end
   if enabled and config.treesitter and #ctx.line <= config.max_scan_bytes then
     local environments, custom_literal
     if ft == "tex" or ft == "plaintex" then
       local tex = require("pairs.config").capture_tex(config, ft, vim.b[buf].pairs_tex_environments)
       environments, custom_literal = tex.environments, tex.custom_literal
-      ctx.pass_reason = tex_pass_reason(ctx, key)
+      ctx.pass_reason = not ctx.generic_rules.keys[key] and tex_pass_reason(ctx, key) or nil
     end
     if ctx.pass_reason then
       return ctx -- These keys cannot edit a pair, regardless of parser state.

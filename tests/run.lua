@@ -1182,6 +1182,15 @@ dofile("tests/surround_syntax.lua")({
   plugin = plugin,
 })
 
+dofile("tests/generic.lua")({
+  test = test,
+  eq = eq,
+  input = input,
+  seed = seed,
+  feed = feed,
+  plugin = plugin,
+})
+
 plugin.teardown()
 if #failures > 0 then
   io.stderr:write(table.concat(failures, "\n\n") .. "\n")

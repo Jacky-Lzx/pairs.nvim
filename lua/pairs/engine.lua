@@ -36,6 +36,10 @@ function M.decide(ctx, key)
   if multi then
     return multi
   end
+  local generic = require("pairs.generic").decide(ctx, key)
+  if generic then
+    return generic
+  end
   if ctx.syntax == "unknown" or ctx.literal_string then
     return decision(
       "pass",

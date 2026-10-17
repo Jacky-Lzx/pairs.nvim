@@ -33,6 +33,7 @@ local function prepare(rules, multi_rules)
     quotes = quotes,
     tick_quotes = tick_quotes,
     has_space = has_space,
+    generic = require("pairs.generic").prepare(multi_rules),
   }
 end
 
@@ -134,31 +135,39 @@ end
 
 local function validate_multi(rules)
   assert(type(rules) == "table", "pairs: multi_pairs must be a table")
+  local generic, aliases, closers, count = {}, {}, {}, 0
+  local function delimiter(value, minimum)
+    return type(value) == "string"
+      and #value >= minimum
+      and #value <= 64
+      and not value:find("[^ -~]")
+  end
   for open, rule in pairs(rules) do
+    count = count + 1
+    assert(count <= 128, "pairs: at most 128 multi-character rules are supported")
+    assert(delimiter(open, 2), "pairs: multi-character opener must be 2-64 printable ASCII bytes")
     assert(
-      open == '"""'
-        or open == "'''"
-        or open == "${"
-        or open == "```"
-        or open == "~~~"
-        or open == "$$"
-        or open == "\\("
-        or open == "\\[",
-      "pairs: unsupported multi-character delimiter"
+      not (
+          #open > 3
+          and (open:match("^`+$") or open:match("^~+$") or open:match('^"+$') or open:match("^'+$"))
+        ),
+      "pairs: longer quote/fence delimiters use the three-character family"
     )
     if rule ~= false then
+      local custom = require("pairs.generic").is_generic(open)
       local fence = open == "```" or open == "~~~"
       local close = ({ ["${"] = "}", ["\\("] = "\\)", ["\\["] = "\\]" })[open] or open
       if type(rule) == "table" and rule.close == nil then
         rule.close = close
       end
       assert(
-        type(rule) == "table" and rule.close == close,
+        type(rule) == "table" and (custom and delimiter(rule.close, 1) or rule.close == close),
         "pairs: multi-character closer does not match its rule"
       )
       for _, key in ipairs({ "open", "skip", "delete", "newline", "space" }) do
         if rule[key] == nil then
           rule[key] = key ~= "space"
+            and not (custom and key == "newline")
             and not (fence and key == "delete")
             and not (open == "\\(" and key == "newline")
         end
@@ -166,6 +175,59 @@ local function validate_multi(rules)
       end
       assert(not fence or not rule.delete, "pairs: Markdown fence deletion is not supported")
       assert(not fence or not rule.space, "pairs: Markdown fence space padding is not supported")
+      if rule.surround ~= nil then
+        assert(
+          type(rule.surround) == "string" and vim.fn.strchars(rule.surround) == 1,
+          "pairs: multi rule.surround must be one identifier"
+        )
+        assert(not aliases[rule.surround], "pairs: duplicate multi rule surround identifier")
+        aliases[rule.surround] = true
+      end
+      if custom then
+        assert(not closers[rule.close], "pairs: generic closing delimiters must be unique")
+        closers[rule.close] = true
+        if rule.contexts == nil then
+          rule.contexts = { "code" }
+        end
+        assert(
+          type(rule.contexts) == "table" and vim.islist(rule.contexts) and #rule.contexts > 0,
+          "pairs: multi rule.contexts must be a nonempty list"
+        )
+        for _, context in ipairs(rule.contexts) do
+          assert(
+            vim.tbl_contains({ "code", "string", "comment" }, context),
+            "pairs: invalid multi rule context"
+          )
+        end
+        assert(
+          rule.condition == nil or type(rule.condition) == "function",
+          "pairs: multi rule.condition must be a function"
+        )
+        generic[#generic + 1] = open
+      else
+        assert(
+          rule.contexts == nil and rule.condition == nil,
+          "pairs: contexts/condition apply to generic multi-character rules only"
+        )
+      end
+    end
+  end
+  for i, open in ipairs(generic) do
+    for other, rule in pairs(rules) do
+      if rule ~= false and not require("pairs.generic").is_generic(other) then
+        assert(
+          (open == "~~" and other == "~~~")
+            or (open:sub(1, #other) ~= other and other:sub(1, #open) ~= open),
+          "pairs: generic openers cannot overlap a specialized language family"
+        )
+      end
+    end
+    for j = i + 1, #generic do
+      local other = generic[j]
+      assert(
+        open:sub(1, #other) ~= other and other:sub(1, #open) ~= open,
+        "pairs: generic opening delimiters cannot be prefixes of each other"
+      )
     end
   end
 end

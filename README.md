@@ -151,6 +151,59 @@ with `treesitter = true` and an installed parser. Space, Backspace and Enter
 follow the same padding rules, retaining each family's Enter behavior.
 `space` defaults to false and is unsupported for Markdown fences.
 
+### Custom multi-character rules
+
+Define literal pairs alongside the existing language families:
+
+```lua
+require("pairs").setup({
+  surround = { enabled = true },
+  filetypes = {
+    markdown = {
+      multi_pairs = {
+        ["**"] = { surround = "*" }, -- defaults to close = "**"
+        ["~~"] = { surround = "~" },
+      },
+    },
+    c = {
+      multi_pairs = {
+        ["/*"] = { close = "*/", newline = true, surround = "c" },
+      },
+    },
+  },
+})
+```
+
+Typing the opener's last character completes the pair. Closing characters skip
+one at a time only after a complete surrounding is found. Empty pairs support
+paired Backspace, optional space padding and optional indented Enter. Existing
+complete closers and closers inserted by standard pairs (such as `[[…]]`) are
+reused. Native undo/redo and dot repeat work, including multiline expansion.
+
+Generic defaults are `open/skip/delete = true`, `newline/space = false`, and
+`contexts = { "code" }`. Opt into string/comment contents with `contexts`.
+An optional `condition(ctx, action)` returns true to permit an action (`open`,
+`skip`, `delete`, `newline`, `space`); it can further restrict the allowed
+contexts. Pending syntax never invokes the condition. For Markdown, use
+`condition = function(ctx) return not ctx.fence end` to exclude parsed fences.
+Prose markers should be enabled in their filetypes rather than globally.
+
+Openers must be 2-64 printable ASCII bytes; closers 1-64 bytes. At most 128
+multi-character rules are allowed. Generic openers cannot be prefixes of each
+other or overlap enabled specialized families, and their closers must be unique.
+Markdown `~~` can coexist with `~~~`: with parser context, the third tilde on
+an empty fence line upgrades the strikeout pair into a fence opener.
+Long quote/fence runs still use the existing three-character family. Explicit
+language rules retain precedence and their parser guards. Generic searches
+cover up to 32 lines ending at the cursor line, within `max_scan_bytes`; an
+unproven closer is typed normally. No mutable pair-tracking state is retained.
+
+The optional `surround` identifier shares left/right strings with surround:
+`saiw*` / `sd*` use the same Markdown bold definition. Auto-pair action flags do
+not control explicit surround edits. Explicit `custom_surroundings` override
+shared definitions, including `false` to disable an identifier. Filetype and
+live `vim.b.pairs_multi_rules` overrides apply to both features.
+
 ### Surround editing
 
 Enable an independent surround module with mini.surround-style
@@ -212,7 +265,8 @@ An input callback can also return a list of regions, each with `left` and
 `right` ranges: `{ from = { row, byte_col }, to = { row, byte_col } }`. Positions
 are zero-based and ends exclusive. The callback receives the buffer, bounded
 search text/lines, and cursor position; it runs again at the new cursor on dot
-repeat. Regions are validated before editing. These specifications use
+repeat. Regions are validated before editing. Custom literal specifications
+retain literal matching when syntax checking is enabled. These specifications use
 pairs.nvim's API, rather than mini.surround's Lua-pattern format.
 
 Optional `surround.treesitter = true` protects brackets inside strings/comments
@@ -284,8 +338,8 @@ Tree-sitter also protects multiline/raw strings and block comments. Parsers are
 not installed automatically. Missing parsers use a line-local lexer; pending or
 unsafe syntax passes keys through. Work is bounded by `max_scan_bytes` (4096 by
 default). Fast wrap accepts only its documented targets; use surround for
-explicit motions/selections. Arbitrary multi-character auto-pair rules and
-command-line auto-pairing are not supported.
+explicit motions/selections. Generic multi-character rules are literal and
+bounded; command-line auto-pairing is not supported.
 
 ## Completion and mappings
 

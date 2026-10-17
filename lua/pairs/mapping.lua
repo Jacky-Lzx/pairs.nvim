@@ -46,6 +46,11 @@ function M.attach(config, handler, fast_wrap)
     for open, rule in pairs(rules) do
       if rule ~= false then
         keys[open:sub(-1)], keys[rule.close:sub(-1)] = true, true
+        if require("pairs.generic").is_generic(open) then
+          for char in rule.close:gmatch(".") do
+            keys[char] = true
+          end
+        end
         if rule.space and config.mappings.space then
           keys[" "] = true
         end
@@ -126,7 +131,10 @@ function M.render(result, ctx)
       .. string.rep(keycode("<C-g>U<Right>"), move)
       .. (result.insert_close and result.close or keycode("<C-g>U<Right>"))
   elseif result.action == "pair" then
-    return result.open .. result.close .. string.rep(keycode("<C-g>U<Left>"), #result.close)
+    return (result.delete_after and string.rep(keycode("<Del>"), result.delete_after) or "")
+      .. result.open
+      .. result.close
+      .. string.rep(keycode("<C-g>U<Left>"), #result.close)
   elseif result.action == "skip" then
     return string.rep(keycode("<C-g>U<Right>"), result.move or #result.close)
   elseif result.action == "delete" then
@@ -138,7 +146,8 @@ function M.render(result, ctx)
       .. require("pairs.newline").keys(
         result.indent_offset,
         result.insert_close and result.close,
-        result.prefix
+        result.prefix,
+        result.clear_comment_leaders
       )
   end
 end

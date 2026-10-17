@@ -4,6 +4,7 @@ Requires Neovim 0.11+. Pure Lua, no runtime dependencies.
 
   |pairs-setup|       Configuration and defaults
   |pairs-space|       Symmetric space padding
+  |pairs-multi|       Custom multi-character rules
   |pairs-fast-wrap|   Wrap an identifier, member chain or call
   |pairs-surround|    Add, delete, replace and locate surroundings
   |pairs-rainbow|     Incremental rainbow bracket highlighting
@@ -44,7 +45,7 @@ Options (only overrides are needed):
   surround             optional surround editing; see |pairs-surround|
   disabled_filetypes   default { 'TelescopePrompt', 'snacks_picker_input' }
   pairs                single-character rules; false disables a rule
-  multi_pairs          opt-in language rules, default {}
+  multi_pairs          opt-in language/custom rules, default {}
   tex_environments     TeX environment name -> text/math/literal/false
   filetypes            filetype -> rule/environment/enabled overrides
 
@@ -196,7 +197,8 @@ add also exists in Visual mode. Search actions have -prev/-next variants.
 Set a default mapping to '' to use only its Plug binding. Surround mapping
 ownership is cleaned up on teardown without deleting replacement mappings.
 PairsSurround defaults to IncSearch and may be customized with nvim_set_hl.
-There is no dependency on mini.surround or installed parsers by default.
+Custom literal rules retain literal matching, including shared multi_pairs
+definitions. There is no dependency on mini.surround or parsers by default.
 surround.treesitter=true (independent of automatic pairing's treesitter option)
 masks parsed strings/comments during bracket/function searches, preserving
 original text for whitespace trimming. Parsed quote targets include complete
@@ -206,6 +208,70 @@ Missing parsers use text matching. A pending tree requests a native time-sliced
 parse and cancels this invocation; no delayed edit is queued. Error/missing
 trees, 10,000 visited nodes or 256 levels reject the search. No parser is
 installed automatically. Custom region callbacks override built-in discovery.
+
+==============================================================================
+CUSTOM MULTI-CHARACTER RULES                              *pairs-multi*
+
+multi_pairs also accepts literal user-defined pairs:
+>lua
+    require('pairs').setup({
+      filetypes = {
+        markdown = { multi_pairs = { ['**'] = {}, ['~~'] = {} } },
+        c = { multi_pairs = { ['/*'] = { close = '*/', newline = true } } },
+      },
+    })
+<
+Openers contain 2-64 printable ASCII bytes; closers 1-64. close defaults to
+the opener. Only the final opening character triggers insertion. A complete
+matching closer is reused; partial closers from standard auto-pairs are
+extended (typing [[ after [ inserted [] does not leave a third ]).
+Closers skip one typed character at a time after a complete pair is proven.
+Empty-pair Backspace deletes both delimiters, as one undoable edit.
+
+Generic rule options:
+  close       string, defaults to the opener
+  open        true
+  skip        true
+  delete      true
+  newline     false; true enables indented empty-pair expansion
+  space       false; true enables one mirrored space and paired removal
+  contexts    { 'code' }; optionally include 'string' and/or 'comment'
+  condition   optional function(ctx, action) returning true to permit action
+  surround    optional one-character identifier for shared surround strings
+
+condition runs after context/boundary guards; it can restrict, not override,
+them. Actions are open/skip/delete/newline/space. ctx includes filetype, line,
+row and col (zero-based byte positions) and optional parser context. Errors
+cancel the custom action. Conditions are not serialized by PairsTrace exports;
+restore them manually when reproducing. Parse-pending states never call them.
+Use condition=function(ctx) return not ctx.fence end for markup rules which
+should exclude parsed Markdown fences. Filetype scope avoids interpreting code
+operators such as ** or << as prose markup.
+
+Generic discovery is literal and bounded by max_scan_bytes. Up to 32 lines,
+including the current line, provide a snapshot for closing-key proof after
+Enter. Existing parsed current-line prefix masking is respected. Origin context
+uses line-local lexical evidence (or the current parser context); this is not
+a full grammar for arbitrary delimiter families. Escaped openers are ignored.
+Pure decisions render native keys: undo/redo and dot replay include insertion,
+deletion, padding and multiline expansion. Native comment leaders are cleared
+before recorded indentation so expanding /* */ does not duplicate '*'.
+
+At most 128 multi-character rules can be declared. Generic opening delimiters
+cannot be prefixes of each other or overlap active specialized families; their
+closing delimiters must be unique. An exception allows Markdown ~~ alongside
+~~~: the third tilde on a parser-confirmed empty fence line upgrades the ~~
+pair to a ~~~ opener. Python triple quotes, JS interpolation, Markdown fences
+and TeX math retain their existing rules, precedence, guards
+and defaults. Longer quote/fence runs use the three-character base family.
+New delimiters must be declared globally or for a filetype at setup to install
+their trigger and closing-character mappings. Buffer overrides change policy.
+
+Rule surround='*' imports {left=opener,right=closer} into |pairs-surround| for
+that identifier, using the effective filetype/buffer multi rule. Explicit
+custom_surroundings win, including false to disable an identifier. Auto-pair
+action flags do not disable explicit surround operations. Shared definitions
+do not enable the surround module or its mappings automatically.
 
 ==============================================================================
 RAINBOW BRACKETS                                         *pairs-rainbow*
@@ -531,7 +597,7 @@ Tree-sitter highlighting. Rainbow coloring uses a separate lexer; see
 
 Paste, macro recording/replay, Replace mode and special buffers bypass
 pairing. Use |pairs-surround| for explicit motion/selection wrapping.
-Arbitrary multi-character auto-pair rules and command-line auto-pairing
-are not supported. See README.md for installation.
+Generic multi-character rules are bounded literal rules; command-line
+auto-pairing is not supported. See README.md for installation.
 
  vim:tw=78:ts=8:ft=help:norl:

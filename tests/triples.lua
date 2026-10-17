@@ -13,8 +13,8 @@ return function(h)
     return copy
   end
 
-  test("multi: unsupported delimiters are rejected", function()
-    eq(pcall(plugin.setup, { multi_pairs = { ["%%"] = { close = "%%" } } }), false)
+  test("multi: nonprintable delimiters are rejected", function()
+    eq(pcall(plugin.setup, { multi_pairs = { ["\n%"] = { close = "%%" } } }), false)
   end)
   test("multi: mismatched closer is rejected", function()
     eq(pcall(plugin.setup, { multi_pairs = { [double] = { close = single } } }), false)

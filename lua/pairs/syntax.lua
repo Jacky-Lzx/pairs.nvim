@@ -370,7 +370,7 @@ function M.capture(buf, row, col, text, environments, custom_literal)
       )
     if inside then
       if kind:find("comment", 1, true) then
-        return with_context({ syntax = "comment" })
+        return with_context({ syntax = "comment", comment_start_row = sr, comment_start_col = sc })
       elseif string_node(kind) then
         return with_context(string_context(buf, node))
       elseif
