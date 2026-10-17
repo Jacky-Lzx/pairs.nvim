@@ -15,20 +15,21 @@ local function region(first, last, left, right, trim, text)
   return { first = first, last = last, inner_first = inner_first, inner_last = inner_last }
 end
 
-local function literal(text, left, right, trim)
+local function literal(text, left, right, trim, masked)
+  local source = masked or text
   local result, stack, i, slashes = {}, {}, 1, 0
   while i <= #text do
     local step = 1
-    if text:sub(i, i + #right - 1) == right and #stack > 0 and slashes % 2 == 0 then
+    if source:sub(i, i + #right - 1) == right and #stack > 0 and slashes % 2 == 0 then
       local first = table.remove(stack)
       result[#result + 1] = region(first - 1, i + #right - 1, #left, #right, trim, text)
       step = #right
-    elseif text:sub(i, i + #left - 1) == left and slashes % 2 == 0 then
+    elseif source:sub(i, i + #left - 1) == left and slashes % 2 == 0 then
       stack[#stack + 1] = i
       step = #left
     end
     for j = i, i + step - 1 do
-      slashes = text:byte(j) == 92 and slashes + 1 or 0
+      slashes = source:byte(j) == 92 and slashes + 1 or 0
     end
     i = i + step
     if #result > 10000 or #stack > 256 then
@@ -113,7 +114,7 @@ local function tags(text)
   return result
 end
 
-function M.candidates(text, spec)
+function M.candidates(text, spec, masked)
   if spec.kind == "tag" then
     return tags(text)
   end
@@ -129,14 +130,14 @@ function M.candidates(text, spec)
   end
   if spec.kind == "bracket" then
     for _, pair in ipairs({ { "(", ")" }, { "[", "]" }, { "{", "}" } }) do
-      append(literal(text, pair[1], pair[2], false))
+      append(literal(text, pair[1], pair[2], false, masked))
     end
   elseif spec.kind == "quote" then
     for _, quote in ipairs({ '"', "'", "`" }) do
       append(literal(text, quote, quote, false))
     end
   elseif spec.kind == "function" then
-    local calls = literal(text, "(", ")", false)
+    local calls = literal(text, "(", ")", false, masked)
     if not calls then
       return nil
     end
@@ -153,7 +154,7 @@ function M.candidates(text, spec)
       end
     end
   else
-    append(literal(text, spec.left, spec.right, spec.trim))
+    append(literal(text, spec.left, spec.right, spec.trim, masked))
   end
   if limited or #result > 10000 then
     return nil
@@ -161,9 +162,8 @@ function M.candidates(text, spec)
   return result
 end
 
-function M.find(text, spec, cursor, method, count)
+function M.select(candidates, cursor, method, count)
   local covering, before, after = {}, {}, {}
-  local candidates = M.candidates(text, spec)
   if not candidates then
     return nil
   end
@@ -220,6 +220,10 @@ function M.find(text, spec, cursor, method, count)
       or covering
   end
   return chosen[count or 1]
+end
+
+function M.find(text, spec, cursor, method, count)
+  return M.select(M.candidates(text, spec), cursor, method, count)
 end
 
 return M

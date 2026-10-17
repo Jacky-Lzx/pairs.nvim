@@ -153,7 +153,7 @@ follow the same padding rules, retaining each family's Enter behavior.
 
 ### Surround editing
 
-Enable an independent, parser-free surround module with mini.surround-style
+Enable an independent surround module with mini.surround-style
 keys. It is disabled by default. Disable mini.surround before using the same
 keys, and load pairs.nvim before Normal-mode editing (for example on
 `VeryLazy`, instead of only `InsertEnter`):
@@ -193,6 +193,7 @@ support undo/redo; they do not register a new surround dot repeat.
 ```lua
 surround = {
   enabled = true,
+  treesitter = false, -- true: ignore brackets in parsed strings/comments
   n_lines = 20,
   search_method = "cover", -- also cover_or_next/prev/nearest, next, prev, nearest
   respect_selection_type = false, -- true: linewise blocks / wrap each block row
@@ -207,7 +208,19 @@ surround = {
 
 Custom input/output specifications are literal strings or callbacks returning
 `{ left = ..., right = ... }` (or `nil` to cancel), including multiline strings.
-They use pairs.nvim's API, rather than mini.surround's Lua-pattern format.
+An input callback can also return a list of regions, each with `left` and
+`right` ranges: `{ from = { row, byte_col }, to = { row, byte_col } }`. Positions
+are zero-based and ends exclusive. The callback receives the buffer, bounded
+search text/lines, and cursor position; it runs again at the new cursor on dot
+repeat. Regions are validated before editing. These specifications use
+pairs.nvim's API, rather than mini.surround's Lua-pattern format.
+
+Optional `surround.treesitter = true` protects brackets inside strings/comments
+and selects complete parsed quotes, including triple quotes. For example,
+`sdf` inside `fn("a)b")` removes the complete function wrapper. Literal text
+inside templates is protected while substitutions remain code. Missing parsers
+retain text matching; pending/error trees cancel the operation without waiting.
+Queries visit at most 10,000 nodes and 256 levels inside the search window.
 Filetype overrides use `filetypes.<ft>.surround`; live buffer overrides use
 `vim.b.pairs_surround_config`. Set `vim.b.pairs_surround_enabled = false` to
 disable only surround in a buffer. The global/buffer pairs toggle also applies.

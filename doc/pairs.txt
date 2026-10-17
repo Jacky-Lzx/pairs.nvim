@@ -72,7 +72,7 @@ an explicitly composed mapping. Buffer-only rules do not install mappings.
 ==============================================================================
 SURROUND EDITING                                         *pairs-surround*
 
-Independent parser-free editing with mini.surround-style keys. Default off:
+Independent editing with mini.surround-style keys. Default off:
 >lua
     require('pairs').setup({ surround = { enabled = true } })
 <
@@ -116,6 +116,7 @@ structural text searches; they do not classify comments or language semantics.
 
 Surround options (all in the surround table):
   enabled                  false
+  treesitter               false; optional parsed string/comment protection
   n_lines                  20 lines in either direction from the cursor
   search_method            'cover'; innermost containing region
   highlight_duration       500 milliseconds
@@ -159,6 +160,20 @@ Custom specifications are literal strings, not mini.surround Lua patterns:
 <
 input/output may be callbacks returning { left=string, right=string } or nil
 to cancel. Input strings must be nonempty; output strings may be empty.
+Input callbacks may instead return one region or a list of regions:
+>lua
+    {
+      left = { from = { 0, 0 }, to = { 0, 1 } },
+      right = { from = { 0, 6 }, to = { 0, 7 } },
+    }
+<
+Positions are {zero-based row, byte column}, with exclusive ends. Ranges must
+be ordered, disjoint, nonempty, within the bounded search window, and aligned
+to UTF-8 boundaries. A region callback runs again at the new cursor on dot.
+Callbacks receive context.buf, context.position={row,col}, context.cursor
+(byte offset in context.text), context.text, context.lines, context.first_row,
+context.starts (per-line byte offsets) and context.changedtick. Nil cancels.
+Returned regions use the same count/search/highlight logic as built-in pairs.
 Multiline strings are supported. Prompt answers are resolved before editing.
 Global options merge with filetypes.<ft>.surround and live buffer overrides:
 >lua
@@ -181,7 +196,16 @@ add also exists in Visual mode. Search actions have -prev/-next variants.
 Set a default mapping to '' to use only its Plug binding. Surround mapping
 ownership is cleaned up on teardown without deleting replacement mappings.
 PairsSurround defaults to IncSearch and may be customized with nvim_set_hl.
-There is no dependency on mini.surround or Tree-sitter.
+There is no dependency on mini.surround or installed parsers by default.
+surround.treesitter=true (independent of automatic pairing's treesitter option)
+masks parsed strings/comments during bracket/function searches, preserving
+original text for whitespace trimming. Parsed quote targets include complete
+triple quote delimiters; string prefixes are retained. Template/f-string
+substitutions remain code. Tag searches retain their text tokenizer.
+Missing parsers use text matching. A pending tree requests a native time-sliced
+parse and cancels this invocation; no delayed edit is queued. Error/missing
+trees, 10,000 visited nodes or 256 levels reject the search. No parser is
+installed automatically. Custom region callbacks override built-in discovery.
 
 ==============================================================================
 RAINBOW BRACKETS                                         *pairs-rainbow*

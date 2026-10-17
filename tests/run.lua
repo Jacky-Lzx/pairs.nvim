@@ -1174,6 +1174,14 @@ dofile("tests/rainbow.lua")({ test = test, eq = eq, seed = seed, plugin = plugin
 
 dofile("tests/surround.lua")({ test = test, eq = eq, seed = seed, feed = feed, plugin = plugin })
 
+dofile("tests/surround_syntax.lua")({
+  test = test,
+  eq = eq,
+  seed = seed,
+  feed = feed,
+  plugin = plugin,
+})
+
 plugin.teardown()
 if #failures > 0 then
   io.stderr:write(table.concat(failures, "\n\n") .. "\n")

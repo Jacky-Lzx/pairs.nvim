@@ -1,6 +1,7 @@
 local M = {}
 M.defaults = {
   enabled = false,
+  treesitter = false,
   mappings = {
     add = "sa",
     delete = "sd",
@@ -26,10 +27,12 @@ local owned, conflicts = {}, {}
 local namespace = vim.api.nvim_create_namespace("pairs.surround")
 local highlight_generation = {}
 local operator_name = "v:lua.require'pairs.surround'.operator"
+local window
 
 function M.validate(opts)
   assert(type(opts) == "table", "pairs: surround must be a table")
   assert(type(opts.enabled) == "boolean", "pairs: surround.enabled must be boolean")
+  assert(type(opts.treesitter) == "boolean", "pairs: surround.treesitter must be boolean")
   assert(
     type(opts.respect_selection_type) == "boolean",
     "pairs: surround.respect_selection_type must be boolean"
@@ -173,7 +176,21 @@ local function specification(id, part, opts)
   if custom then
     local value = custom[part]
     if type(value) == "function" then
-      value = value()
+      local context = window(opts)
+      if not context then
+        return nil
+      end
+      local callback = value
+      value = callback(context)
+      if
+        vim.api.nvim_get_current_buf() ~= context.buf
+        or vim.api.nvim_buf_get_changedtick(context.buf) ~= context.changedtick
+      then
+        return nil
+      end
+      if part == "input" and type(value) == "table" and type(value.left) ~= "string" then
+        return { matcher = callback, initial = value }
+      end
     end
     if value == nil then
       return nil
@@ -263,7 +280,7 @@ local function byte_position(window, offset)
   return { window.first_row, 0 }
 end
 
-local function window(opts)
+window = function(opts)
   local pos = vim.api.nvim_win_get_cursor(0)
   local first = math.max(0, pos[1] - 1 - opts.n_lines)
   local last = math.min(vim.api.nvim_buf_line_count(0), pos[1] + opts.n_lines)
@@ -281,7 +298,56 @@ local function window(opts)
     starts = starts,
     first_row = first,
     cursor = starts[pos[1] - first] + pos[2],
+    position = { pos[1] - 1, pos[2] },
+    buf = vim.api.nvim_get_current_buf(),
+    changedtick = vim.api.nvim_buf_get_changedtick(0),
+    lines = lines,
   }
+end
+
+local function callback_regions(value, context)
+  if value == nil then
+    return {}
+  end
+  assert(type(value) == "table", "pairs: surround matcher must return a region list or nil")
+  if value.left then
+    value = { value }
+  end
+  assert(vim.islist(value) and #value <= 10000, "pairs: invalid surround region list")
+  local function offset(pos)
+    assert(
+      type(pos) == "table"
+        and type(pos[1]) == "number"
+        and type(pos[2]) == "number"
+        and pos[1] % 1 == 0
+        and pos[2] % 1 == 0,
+      "pairs: region positions must be { row, byte_col } integers"
+    )
+    local index = pos[1] - context.first_row + 1
+    assert(
+      context.lines[index] and pos[2] >= 0 and pos[2] <= #context.lines[index],
+      "pairs: surround region outside search window"
+    )
+    local byte = context.lines[index]:byte(pos[2] + 1)
+    assert(not byte or byte < 128 or byte >= 192, "pairs: surround region splits a UTF-8 character")
+    return context.starts[index] + pos[2]
+  end
+  local result = {}
+  for _, item in ipairs(value) do
+    assert(
+      type(item) == "table" and type(item.left) == "table" and type(item.right) == "table",
+      "pairs: region requires left and right ranges"
+    )
+    local first, inner_first = offset(item.left.from), offset(item.left.to)
+    local inner_last, last = offset(item.right.from), offset(item.right.to)
+    assert(
+      first < inner_first and inner_first <= inner_last and inner_last < last,
+      "pairs: surround ranges must be ordered, nonempty and disjoint"
+    )
+    result[#result + 1] =
+      { first = first, inner_first = inner_first, inner_last = inner_last, last = last }
+  end
+  return result
 end
 
 local function find(spec, opts, method, count)
@@ -289,13 +355,31 @@ local function find(spec, opts, method, count)
   if not context then
     return nil
   end
-  local region = require("pairs.surround_scan").find(
-    context.text,
-    spec,
-    context.cursor,
-    method or opts.search_method,
-    count
-  )
+  local scan = require("pairs.surround_scan")
+  local candidates
+  if spec.matcher then
+    local value = spec.initial
+    spec.initial = nil
+    if value == nil then
+      value = spec.matcher(context)
+    end
+    candidates = callback_regions(value, context)
+  elseif opts.treesitter then
+    local reason
+    candidates, reason = require("pairs.surround_syntax").candidates(context, spec)
+    if reason == "missing_parser" then
+      candidates = scan.candidates(context.text, spec)
+    end
+  else
+    candidates = scan.candidates(context.text, spec)
+  end
+  if
+    vim.api.nvim_get_current_buf() ~= context.buf
+    or vim.api.nvim_buf_get_changedtick(context.buf) ~= context.changedtick
+  then
+    return nil
+  end
+  local region = scan.select(candidates, context.cursor, method or opts.search_method, count)
   if not region then
     return nil
   end
