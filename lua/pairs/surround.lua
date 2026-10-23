@@ -264,7 +264,7 @@ local function specification(id, part, opts)
     if not right or (part == "input" and (#left == 0 or #right == 0)) then
       return nil
     end
-    return { left = left, right = right }
+    return { left = left, right = right, literal = part == "input" }
   end
   return { left = id, right = id }
 end

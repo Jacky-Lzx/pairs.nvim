@@ -110,6 +110,13 @@ Identifiers:
   ?             Prompt for literal left and right strings
   other         Same character on both sides (including Unicode)
 
+With sr)?, enter the new left delimiter and press <CR>, then enter the new
+right delimiter and press <CR>. For example, sr)?【<CR>】<CR> replaces (word)
+with 【word】. Use sr?BEGIN<CR>END<CR>] to replace BEGINwordEND with [word].
+Prompted input delimiters are literal, including with treesitter=true, and
+must both be nonempty. <Esc> cancels either prompt without editing; dot repeat
+reuses the entered delimiters without prompting again.
+
 Tag search handles quoted attributes, same-name nesting, comments, HTML void
 elements and self-closing tags. Malformed/mismatched markup is not repaired.
 Function names accept ASCII identifiers and dotted chains. Searches are

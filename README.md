@@ -238,6 +238,13 @@ calls and prompts for a function name. `?` prompts for literal left/right
 strings. Other characters surround with themselves; escaped delimiters are
 ignored during searches.
 
+Use `sr)?` to replace parentheses with custom strings: enter the new left
+delimiter, press Enter, then enter the right delimiter and press Enter.
+For example, `sr)?【<Enter>】<Enter>` changes `(word)` to `【word】`.
+Use `sr?BEGIN<Enter>END<Enter>]` to replace `BEGINwordEND` with `[word]`.
+`?` searches literal delimiters even with Tree-sitter enabled. Escape cancels
+either prompt without changing the text; `.` reuses the entered strings.
+
 Search defaults to the innermost surrounding that covers the cursor, within
 20 lines in either direction. Counts choose outer surroundings (`2sd)`), or
 repeat added wrappers (`2saiw)`). Motion counts work separately (`sa2aw)`).

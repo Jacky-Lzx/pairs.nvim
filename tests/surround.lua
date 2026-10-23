@@ -79,6 +79,25 @@ return function(t)
     custom_surroundings = { ["*"] = { input = { left = "**", right = "**" } } },
   })
   input("prompt literals", "│hello", "saiw?BEGIN<CR>END<CR>", "BEGINhelloEND")
+  input("prompt replacement", "(he│llo)", "sr)?BEGIN<CR>END<CR>", "BEGINhelloEND")
+  input("prompt replacement Unicode", "(he│llo)", "sr)?【<CR>】<CR>", "【hello】")
+  input("prompt target", "BEGINhe│lloEND", "sr?BEGIN<CR>END<CR>]", "[hello]")
+  input(
+    "prompt target and replacement",
+    "BEGINhe│lloEND",
+    "sr?BEGIN<CR>END<CR>?<<CR>><CR>",
+    "<hello>"
+  )
+  input("prompt target preserves padding", "(  he│llo  )", "sr?(<CR>)<CR>]", "[  hello  ]")
+  input("prompt target rejects empty left", "he│lloEND", "sr?<CR>END<CR>", "helloEND")
+  input("prompt target rejects empty right", "BEGINhe│llo", "sr?BEGIN<CR><CR>", "BEGINhello")
+  input("cancel prompt target left", "(he│llo)", "sr?<Esc>", "(hello)")
+  input("cancel prompt target right", "(he│llo)", "sr?(<CR><Esc>", "(hello)")
+  input("cancel prompt replacement left", "(he│llo)", "sr)?<Esc>", "(hello)")
+  input("cancel prompt replacement right", "(he│llo)", "sr)?[<CR><Esc>", "(hello)")
+  input("undo prompt replacement", "(he│llo)", "sr)?BEGIN<CR>END<CR>u", "(hello)")
+  input("dot prompt replacement", "(│one) (two)", "sr)?[<CR>]<CR>W.", "[one] [two]")
+  input("dot prompt target", "BEGIN│oneEND BEGINtwoEND", "sr?BEGIN<CR>END<CR>]W.", "[one] [two]")
   input("empty braces", "(│)", "sr)]", "[]")
   input("undo add", "│hello", 'saiw"u', "hello")
   input("redo add", "│hello", 'saiw"u<C-r>', '"hello"')

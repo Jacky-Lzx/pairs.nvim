@@ -25,6 +25,9 @@ return function(t)
     input("brackets ignore body quote closer", 'fn("a│)b")', "sd)", 'fn"a)b"')
     input("trim preserves masked body", 'fn(  "a│)b"  )', "sd(", 'fn"a)b"')
     input("replace function", 'fn("a│)b")', "srf]", '["a)b"]')
+    input("prompt replacement", 'fn("he│llo")', "sr)?【<CR>】<CR>", 'fn【"hello"】')
+    input("prompt target inside string", '"BEGINhe│lloEND"', "sr?BEGIN<CR>END<CR>]", '"[hello]"')
+    input("prompt target inside comment", "# BEGINhe│lloEND", "sr?BEGIN<CR>END<CR>]", "# [hello]")
     input("nested function count", 'outer(inner("a│)b"))', "2sdf", 'inner("a)b")')
     input("quoted fake call", 'fn("fake(│x)")', "sdf", '"fake(x)"')
     input("comment fake closers", "fn(\n  │x, # ) fake(y)\n)", "sdf", "x, # ) fake(y)")
@@ -74,6 +77,24 @@ return function(t)
     vim.treesitter.get_parser = get
     t.eq(requests, 1)
     t.eq(text(), "fn(x)")
+  end)
+  t.test("syntax surround prompted target bypasses parser", function()
+    seed("BEGINhe│lloEND")
+    local get = vim.treesitter.get_parser
+    local requests = 0
+    vim.treesitter.get_parser = function()
+      requests = requests + 1
+      return {
+        is_valid = function()
+          return false
+        end,
+        parse = function() end,
+      }
+    end
+    t.feed("sr?BEGIN<CR>END<CR>]")
+    vim.treesitter.get_parser = get
+    t.eq(text(), "[hello]")
+    t.eq(requests, 0)
   end)
   local function regions(context)
     local row = context.position[1]
