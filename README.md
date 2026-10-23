@@ -140,6 +140,9 @@ requires exactly one ASCII space on each side. Enter trims this padding before
 expanding. Set `skip_space = true` separately to make `( value│ )` + `)` move to
 `( value )│`. Both options default to false.
 
+The Space mapping uses `<nowait>` to avoid waiting for a longer mapping. To use
+Space as a mapping prefix, set `mappings.space = false`.
+
 For multi-character pairs, enable `space` on the individual rule:
 
 ```lua

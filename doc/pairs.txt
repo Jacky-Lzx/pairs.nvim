@@ -365,6 +365,9 @@ space before the closer. It works independently of space. Both options default
 to false. Space/paired BS apply only to empty brackets; tabs, strings and
 comments use ordinary input.
 
+The Space mapping uses <nowait> to avoid waiting for a longer mapping. To use
+Space as a mapping prefix, set mappings.space=false.
+
 Multi-character rules use the same space=true option: >lua
     multi_pairs = { ['\\('] = { space = true } }
 <

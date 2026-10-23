@@ -10,3 +10,4 @@ export XDG_DATA_HOME="$task_tmp/data"
 export NVIM_LOG_FILE="$task_tmp/nvim.log"
 "${NVIM:-nvim}" --headless -u tests/minimal_init.lua -i NONE -l tests/run.lua
 "${NVIM:-nvim}" --headless -u tests/minimal_init.lua -i NONE -l tests/rainbow_ui.lua
+"${NVIM:-nvim}" --headless -u tests/minimal_init.lua -i NONE -l tests/space_ui.lua

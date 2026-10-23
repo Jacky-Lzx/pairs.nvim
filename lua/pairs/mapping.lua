@@ -96,7 +96,12 @@ function M.attach(config, handler, fast_wrap)
       -- Expr mappings may be evaluated before preceding typed text is applied.
       -- Ignore flushes that text before the private expression is evaluated.
       local rhs = "<Ignore>" .. plug
-      vim.keymap.set("i", lhs, rhs, { silent = true, desc = "pairs.nvim " .. lhs })
+      -- Space is text input: do not wait for a longer mapping to complete.
+      vim.keymap.set("i", lhs, rhs, {
+        silent = true,
+        nowait = key == " ",
+        desc = "pairs.nvim " .. lhs,
+      })
       mappings[lhs_code] = { rhs = rhs }
       mappings[plug_code] = { callback = callback }
       M.owned[#M.owned + 1] = { lhs = lhs, plug = plug, rhs = rhs, callback = callback }
