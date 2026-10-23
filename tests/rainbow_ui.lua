@@ -130,9 +130,47 @@ local ok, err = xpcall(function()
   lua("require('pairs.rainbow').toggle()")
   ready()
   expect(0, 0, 0xe06c75)
+  lua([[
+    vim.cmd('only')
+    vim.g.markdown_fenced_languages = {'lua'}
+    vim.bo.filetype = 'markdown'
+    vim.api.nvim_buf_set_lines(0, 0, -1, false, {
+      '```lua',
+      'require("pairs").setup({',
+      '  pairs = {',
+      '    ["("] = { space = true },',
+      '    ["["] = { space = true },',
+      '    ["{"] = { space = true },',
+      '  },',
+      '})',
+      '```',
+      '{}',
+    })
+    vim.cmd('normal! ggzt')
+    -- Distinct literal color catches accidental rainbow overrides in strings.
+    vim.api.nvim_set_hl(0, 'String', {fg = '#123456'})
+    vim.cmd('syntax on')
+  ]])
+  ready()
+  for row = 3, 5 do
+    expect(row, 4, 0xd19a66)
+    expect(row, 8, 0xd19a66)
+    expect(row, 12, 0xd19a66)
+    expect(row, 27, 0xd19a66)
+    expect(row, 6, 0x123456)
+  end
+  expect(6, 2, 0x61afef)
+  expect(7, 0, 0xe5c07b)
+  expect(7, 1, 0xe06c75)
+  expect(9, 0, 0xe06c75)
+  expect(9, 1, 0xe06c75)
+  lua("vim.api.nvim_buf_set_lines(0, 0, 1, false, {'```text'})")
+  ready()
+  expect(3, 6, 0x98c379) -- A language edit repaints the former string bracket.
+  expect(9, 0, 0xe06c75)
   lua("require('pairs').teardown()")
   request("nvim_command", { "redraw" })
-  assert(fg(0, 0) ~= 0xe06c75, "teardown left stale colors")
+  assert(fg(9, 0) ~= 0xe06c75, "teardown left stale colors")
 end, debug.traceback)
 child:kill("sigterm")
 vim.wait(1000, function()
@@ -147,5 +185,7 @@ if not ok then
   io.stderr:write(err .. "\n" .. table.concat(errors))
   vim.cmd("cquit 1")
 end
-io.stdout:write("PASS: rainbow UI colors, edits, split windows, scroll, toggle and teardown\n")
+io.stdout:write(
+  "PASS: rainbow UI colors, Markdown fences, edits, split windows, scroll, toggle and teardown\n"
+)
 vim.cmd("qa!")

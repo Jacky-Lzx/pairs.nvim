@@ -11,6 +11,127 @@ return function(h)
     end
     return result, state
   end
+  local markdown_lua = {
+    [[require("pairs").setup({]],
+    [[  treesitter = true, -- optional: requires your own installed parsers]],
+    [[  pairs = {]],
+    [[    ["("] = { space = true },]],
+    [[    ["["] = { space = true },]],
+    [[    ["{"] = { space = true },]],
+    [[    ["'"] = { open = false }, -- keep skipping and paired deletion]],
+    [[  },]],
+    [[  mappings = { fast_wrap = "<M-e>" }, -- optional Insert-mode shortcut]],
+    [[  surround = { enabled = true }, -- optional; disabled by default]],
+    [[  filetypes = {]],
+    [[    markdown = { pairs = { ["'"] = { open = false } } },]],
+    [[    help = { enabled = false },]],
+    [[  },]],
+    [[})]],
+  }
+
+  test("rainbow: Markdown Lua example uses code nesting instead of string contents", function()
+    local lines = vim.list_extend({ "```lua" }, markdown_lua)
+    lines[#lines + 1] = "```"
+    local expected = vim.list_extend({ {} }, (lex(markdown_lua, "lua")))
+    expected[#expected + 1] = {}
+    local actual, state = lex(lines, "markdown")
+    eq(actual, expected)
+    eq(actual[5], { 4, 4, 8, 4, 12, 4, 27, 4 })
+    eq(state, scanner.initial())
+  end)
+  test("rainbow: Markdown fences isolate code state and restore prose depth", function()
+    local marks, state = lex({
+      "{",
+      "```lua",
+      "{ -- (",
+      "[=[",
+      "```", -- Markdown closes the fence even inside a Lua long string.
+      "}",
+      "~~~py",
+      [[f(")") # (]],
+      "~~~",
+      "()",
+    }, "markdown")
+    eq(marks, {
+      { 0, 1 },
+      {},
+      { 0, 1 },
+      {},
+      {},
+      { 0, 1 },
+      {},
+      { 1, 1, 5, 1 },
+      {},
+      { 0, 1, 1, 1 },
+    })
+    eq(state, scanner.initial())
+  end)
+  test("rainbow: Markdown closing fences require matching runs and no info", function()
+    eq(
+      lex({
+        "   ````lua title (",
+        "```",
+        "~~~~",
+        "````lua",
+        [=["(" () -- []]=],
+        "````` \t",
+        "{}",
+      }, "markdown"),
+      { {}, {}, {}, {}, { 4, 1, 5, 1 }, {}, { 0, 1, 1, 1 } }
+    )
+    eq(lex({ "  ~~~js title `", [[f(")"); // (]], "   ~~~~", "()" }, "markdown"), {
+      {},
+      { 1, 1, 5, 1 },
+      {},
+      { 0, 1, 1, 1 },
+    })
+  end)
+  test("rainbow: Markdown language aliases and unclosed multiline code", function()
+    local marks, state = lex({ "```JS extra", "/* (", "[]", "*/ ()" }, "markdown")
+    eq(marks, { {}, {}, {}, { 3, 1, 4, 1 } })
+    eq(state.language, "javascript")
+    eq(state.fence, "```")
+    eq(lex({ "~~~python", '"""[', '{""" ()', "~~~" }, "markdown"), {
+      {},
+      {},
+      { 5, 1, 6, 1 },
+      {},
+    })
+    eq(lex({ "```json", '{"[": "("}', "```" }, "markdown"), {
+      {},
+      { 0, 1, 9, 1 },
+      {},
+    })
+  end)
+  test("rainbow: unknown and unlabelled fences use isolated literal nesting", function()
+    for _, info in ipairs({ "", "unknown-language" }) do
+      eq(lex({ "{", "```" .. info, '"("', "```", "}" }, "markdown"), {
+        { 0, 1 },
+        {},
+        { 1, 1 },
+        {},
+        { 0, 1 },
+      })
+    end
+  end)
+  test("rainbow: inline, short, overindented and invalid fences remain prose", function()
+    local lines = { "text ```lua", "``lua", "    ```lua", "```lua`", '"("' }
+    local marks, state = lex(lines, "markdown")
+    eq(marks, { {}, {}, {}, {}, { 1, 1 } })
+    eq(state.fence, nil)
+    eq(lex({ "```lua", '"("', "```" }, "text"), { {}, { 1, 1 }, {} })
+  end)
+  test("rainbow: convergence distinguishes fence language, length and prose stack", function()
+    local _, lua = lex({ "```lua" }, "markdown")
+    local _, same = lex({ "```lua" }, "markdown")
+    local _, python = lex({ "```py" }, "markdown")
+    local _, longer = lex({ "````lua" }, "markdown")
+    local _, outer = lex({ "{", "```lua" }, "markdown")
+    eq(scanner.equal(lua, same), true)
+    for _, other in ipairs({ scanner.initial(), python, longer, outer }) do
+      eq(scanner.equal(lua, other), false)
+    end
+  end)
 
   test("rainbow: mixed nesting, matched colors, UTF-8 byte columns", function()
     eq(lex({ "你({[]})" }), { { 3, 1, 4, 2, 5, 3, 6, 3, 7, 2, 8, 1 } })
@@ -175,40 +296,85 @@ return function(h)
     vim.api.nvim_buf_set_lines(0, 25000, 25001, false, {})
     eq(settle().scanned_lines - inserted.scanned_lines, 1)
   end)
-  test("rainbow: randomized batched line edits agree with a fresh full scan", function()
-    setup(vim.fn["repeat"]({ "()" }, 30), "lua")
-    settle()
-    local rand = 42
-    local function random(n)
-      rand = (rand * 48271) % 2147483647
-      return rand % n
-    end
-    local choices = { "{", "}", "([])", "--[=[", "]=]", "[=[", "'[]'", "", "[", "]" }
-    for _ = 1, 100 do
-      for _ = 1, random(5) + 1 do
-        local count = vim.api.nvim_buf_line_count(0)
-        local first = random(count + 1)
-        local last = math.min(count, first + random(3))
-        local replacement = {}
-        for _ = 1, random(3) do
-          replacement[#replacement + 1] = choices[random(#choices) + 1]
-        end
-        vim.api.nvim_buf_set_lines(0, first, last, false, replacement)
+  test("rainbow: large Markdown code blocks retain bounded incremental updates", function()
+    local lines = vim.fn["repeat"]({ "f(value)" }, 50000)
+    lines[1], lines[#lines] = "```lua", "```"
+    setup(lines, "markdown")
+    local before = settle()
+    vim.api.nvim_buf_set_lines(0, 25000, 25001, false, { 'f("(")' })
+    local changed = settle()
+    eq(changed.scanned_lines - before.scanned_lines, 1)
+    eq(paint(25000), { { 25000, 1, "PairsRainbowRed" }, { 25000, 5, "PairsRainbowRed" } })
+    vim.api.nvim_buf_set_lines(0, 25000, 25000, false, { "[]" })
+    local inserted = settle()
+    eq(inserted.scanned_lines - changed.scanned_lines, 2)
+    vim.api.nvim_buf_set_lines(0, 25000, 25001, false, {})
+    eq(settle().scanned_lines - inserted.scanned_lines, 1)
+  end)
+  for _, ft in ipairs({ "lua", "markdown" }) do
+    test("rainbow: randomized batched edits agree with a fresh " .. ft .. " scan", function()
+      setup(vim.fn["repeat"]({ "()" }, 30), ft)
+      settle()
+      local rand = 42
+      local function random(n)
+        rand = (rand * 48271) % 2147483647
+        return rand % n
       end
-      local status = settle()
-      local all = lex(vim.api.nvim_buf_get_lines(0, 0, -1, false))
-      local total = 0
-      for row, marks in ipairs(all) do
-        local expected = {}
-        for i = 1, #marks, 2 do
-          local groups = require("pairs.config").defaults.rainbow.highlights
-          expected[#expected + 1] = { row - 1, marks[i], groups[(marks[i + 1] - 1) % #groups + 1] }
+      local choices = {
+        "{",
+        "}",
+        "([])",
+        "--[=[",
+        "]=]",
+        "[=[",
+        "'[]'",
+        "",
+        "[",
+        "]",
+        "```lua",
+        "```py",
+        "```",
+        "~~~~js",
+        "~~~~",
+        "````",
+        "```text",
+      }
+      for _ = 1, 100 do
+        for _ = 1, random(5) + 1 do
+          local count = vim.api.nvim_buf_line_count(0)
+          local first = random(count + 1)
+          local last = math.min(count, first + random(3))
+          local replacement = {}
+          for _ = 1, random(3) do
+            replacement[#replacement + 1] = choices[random(#choices) + 1]
+          end
+          vim.api.nvim_buf_set_lines(0, first, last, false, replacement)
         end
-        total = total + #marks / 2
-        eq(paint(row - 1), expected)
+        local status = settle()
+        local all = lex(vim.api.nvim_buf_get_lines(0, 0, -1, false), ft)
+        local total = 0
+        for row, marks in ipairs(all) do
+          local expected = {}
+          for i = 1, #marks, 2 do
+            local groups = require("pairs.config").defaults.rainbow.highlights
+            expected[#expected + 1] =
+              { row - 1, marks[i], groups[(marks[i + 1] - 1) % #groups + 1] }
+          end
+          total = total + #marks / 2
+          eq(paint(row - 1), expected)
+        end
+        eq(status.brackets, total)
       end
-      eq(status.brackets, total)
-    end
+    end)
+  end
+  test("rainbow: editing a fence language rescans its body and converges after closing", function()
+    setup({ "```lua", "-- ()", "{}", "```", "[]" }, "markdown")
+    local before = settle()
+    eq(paint(1), {})
+    vim.api.nvim_buf_set_lines(0, 0, 1, false, { "```python" })
+    eq(settle().scanned_lines - before.scanned_lines, 4)
+    eq(paint(1), { { 1, 3, "PairsRainbowRed" }, { 1, 4, "PairsRainbowRed" } })
+    eq(paint(4), { { 4, 0, "PairsRainbowRed" }, { 4, 1, "PairsRainbowRed" } })
   end)
   test("rainbow: edit bursts and large replacements discard obsolete caches", function()
     setup(vim.fn["repeat"]({ "()" }, 1000), "lua")

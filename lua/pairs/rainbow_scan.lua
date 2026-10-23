@@ -25,6 +25,49 @@ local templates =
   { javascript = true, javascriptreact = true, typescript = true, typescriptreact = true }
 local prose = { text = true, markdown = true, tex = true, plaintex = true }
 local lex = require("pairs.lex")
+local languages = {
+  js = "javascript",
+  jsx = "javascriptreact",
+  ts = "typescript",
+  tsx = "typescriptreact",
+  py = "python",
+  rs = "rust",
+  golang = "go",
+  shell = "sh",
+  ["c++"] = "cpp",
+  csharp = "cs",
+  ["c#"] = "cs",
+  md = "markdown",
+  txt = "text",
+  plaintext = "text",
+  latex = "tex",
+}
+
+local function fence_line(text)
+  local run, info = text:match("^ ? ? ?(`+)(.*)$")
+  if not run then
+    run, info = text:match("^ ? ? ?(~+)(.*)$")
+  end
+  if run and #run >= 3 then
+    return run, info
+  end
+end
+
+local function fence_language(info)
+  local language = (info:match("^%s*(%S+)") or ""):lower()
+  language = languages[language] or language
+  if
+    hash[language]
+    or slash[language]
+    or prose[language]
+    or language == "lua"
+    or language == "go"
+    or language == "json"
+  then
+    return language
+  end
+  return "markdown" -- Unlabelled/unknown fences retain literal nesting.
+end
 
 local function rust_char(text, pos)
   local first = lex.next(text, pos)
@@ -40,10 +83,16 @@ function M.initial()
 end
 
 function M.equal(a, b)
-  return a.stack == b.stack and a.mode == b.mode and a.close == b.close and a.nesting == b.nesting
+  return a.stack == b.stack
+    and a.mode == b.mode
+    and a.close == b.close
+    and a.nesting == b.nesting
+    and a.fence == b.fence
+    and a.language == b.language
+    and a.outer_stack == b.outer_stack
 end
 
-function M.line(text, previous, ft, limits)
+local function scan_line(text, previous, ft, limits)
   local state = {
     stack = previous.stack,
     mode = previous.mode,
@@ -195,6 +244,40 @@ function M.line(text, previous, ft, limits)
     state.mode, state.close = "", ""
   end
   return { after = state, marks = marks }
+end
+
+function M.line(text, previous, ft, limits)
+  if ft ~= "markdown" then
+    return scan_line(text, previous, ft, limits)
+  end
+  -- Fence boundaries belong to Markdown even inside an unfinished code string
+  -- or comment. Keep their metadata scalar for incremental cache convergence.
+  local run, info = fence_line(text)
+  if previous.fence then
+    if
+      run
+      and run:sub(1, 1) == previous.fence:sub(1, 1)
+      and #run >= #previous.fence
+      and info:match("^%s*$")
+    then
+      local state = M.initial()
+      state.stack = previous.outer_stack
+      return { after = state, marks = {} }
+    end
+    local entry, reason = scan_line(text, previous, previous.language, limits)
+    if entry then
+      entry.after.fence = previous.fence
+      entry.after.language = previous.language
+      entry.after.outer_stack = previous.outer_stack
+    end
+    return entry, reason
+  end
+  if run and (run:sub(1, 1) ~= "`" or not info:find("`", 1, true)) then
+    local state = M.initial()
+    state.fence, state.language, state.outer_stack = run, fence_language(info), previous.stack
+    return { after = state, marks = {} }
+  end
+  return scan_line(text, previous, ft, limits)
 end
 
 return M

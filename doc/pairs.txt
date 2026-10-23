@@ -324,9 +324,14 @@ preserves explicit colors. For example: >lua
     vim.api.nvim_set_hl(0, 'PairsRainbowRed', { fg = '#f38ba8' })
 <
 A separate lexer handles common strings/comments, raw/triple strings and
-nested JS templates; Markdown/plain text use literal nesting. Regex, JSX,
-injections, TeX verbatim and heredocs are not parsed exactly. Disable rainbow
-where those constructs require a parser-based highlighter.
+nested JS templates. Markdown backtick/tilde fences (up to three leading
+spaces) use the info string's language, including aliases such as js, ts and
+py, without requiring a parser. Each code block has independent nesting;
+closing the fence restores the surrounding prose depth. Unlabelled/unknown
+fences and Markdown/plain text use literal nesting. List/blockquote fence
+containers, regex, JSX, other injections, TeX verbatim and heredocs are not
+parsed exactly. Disable rainbow where those constructs require a parser-based
+highlighter.
 
 Scanning runs in background slices; rendering uses cached visible rows.
 Pending rows keep normal colors. Exceeding a limit clears rainbow only; later
