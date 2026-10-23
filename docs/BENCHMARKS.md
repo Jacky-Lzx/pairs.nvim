@@ -33,7 +33,7 @@ These are local observations, not portable timing guarantees or CI thresholds.
 ## Rainbow brackets: 2026-10-18
 
 Run `./tests/bench-rainbow.sh` with isolated XDG directories. Options are
-`NVIM`, `PAIRS_BENCH_LINES` (default 50000, range 1000-100000),
+`NVIM_BIN`, `PAIRS_BENCH_LINES` (default 50000, range 1000-100000),
 `PAIRS_BENCH_SAMPLES` (default 100, minimum 20), and `PAIRS_BENCH_OUTPUT`
 (optional JSON path). This benchmark sets debounce_ms=0 to separate processing
 from the default 20 ms quiet period. It measures a 50,000-line Lua buffer of
@@ -80,7 +80,9 @@ PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers \
   PAIRS_BENCH_OUTPUT=/tmp/pairs-benchmark.json ./tests/bench.sh
 ```
 
-Set `NVIM` to another executable to check a supported version. Defaults are
+Set `NVIM_BIN` to another executable to check a supported version, including for
+`./tests/run.sh`. `NVIM` is reserved for the parent Neovim's RPC address when
+running inside its terminals/jobs. Defaults are
 1000 decision samples (minimum 100), 50000 file lines (minimum 1000), and 20
 mapped batch samples (minimum 5). JSON schema 1 records Neovim/CPU/OS versions,
 parameters, Git revision/dirty state, runtime source and benchmark SHA-256,
