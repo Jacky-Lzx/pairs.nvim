@@ -1,226 +1,102 @@
-*pairs.nvim*  Conservative quote and bracket pairing for Neovim
+*pairs.nvim*  Quote and bracket pairing for Neovim 0.11+
 
-Requires Neovim 0.11+. Pure Lua, no runtime dependencies.
+Pure Lua, no runtime dependencies. Disable other auto-pairs plugins.
 
   |pairs-setup|       Configuration and defaults
-  |pairs-space|       Symmetric space padding
-  |pairs-multi|       Custom multi-character rules
-  |pairs-fast-wrap|   Wrap an identifier, member chain or call
-  |pairs-surround|    Add, delete, replace and locate surroundings
-  |pairs-rainbow|     Incremental rainbow bracket highlighting
+  |pairs-space|       Space padding
+  |pairs-multi|       Multi-character rules
+  |pairs-fast-wrap|   Wrap an identifier or call
+  |pairs-surround|    Surround editing
+  |pairs-rainbow|     Rainbow brackets
   |pairs-triples|     Python triple quotes
-  |pairs-templates|   JavaScript/TypeScript templates
-  |pairs-fences|      Markdown code fences
+  |pairs-templates|   JS/TS templates
+  |pairs-fences|      Markdown fences
   |pairs-tex|         LaTeX math and context
-  |pairs-enter|       Enter and completion integration
+  |pairs-enter|       Enter and completion
   |pairs-api|         Lua API
-  |pairs-commands|    Commands and diagnostics
-  |pairs-limits|      Syntax and mapping limits
+  |pairs-commands|    Commands
+  |pairs-trace|       Diagnose a mispair
+  |pairs-bench|       Tests and benchmarks
+  |pairs-limits|      Limits
 
 ==============================================================================
 SETUP                                                    *pairs-setup*
 
-Disable other auto-pairs plugins, then call setup (require alone does not
-install mappings): >lua
+Call setup to install mappings; require alone does not. Only overrides are
+needed: >lua
     require('pairs').setup({
-      treesitter = true, -- optional; requires installed parsers
+      treesitter = true, -- optional; install parsers yourself
       pairs = { ['('] = { space = true } },
     })
 <
-Defaults pair (), [], {}, double and single quotes. Matching closers are
-skipped; <BS> removes adjacent empty pairs; <CR> expands empty brackets.
-Quotes next to words/non-ASCII text open conservatively. Single-quote opening
-is disabled in text, markdown and rust. Tab is never mapped.
+Defaults pair (), [], {}, double and single quotes. Closers skip, <BS> deletes
+empty pairs, and <CR> expands empty brackets. Quotes open conservatively near
+words/non-ASCII text; single-quote opening is off in text, markdown and rust.
+Tab is never mapped. Rainbow brackets are on; surround editing is off.
 
-Options (only overrides are needed):
-  enabled              boolean or function(bufnr), default true
-  mappings.enabled     install non-conflicting mappings, default true
-  mappings.bs          install <BS>, default true
-  mappings.cr          install <CR>, default true; see |pairs-enter|
-  mappings.space       allow opt-in Space mapping, default true
-  mappings.fast_wrap   shortcut such as '<M-e>' or '<F8>', default false
-  max_scan_bytes       scan budget in bytes, default 4096
-  treesitter           use installed parsers, default false
-  rainbow              rainbow highlighting options; see |pairs-rainbow|
-  surround             optional surround editing; see |pairs-surround|
-  disabled_filetypes   default { 'TelescopePrompt', 'snacks_picker_input' }
+Options and defaults:
+  enabled              true; also accepts function(bufnr)
+  mappings.enabled     true; preserve existing mappings
+  mappings.bs          true
+  mappings.cr          true; see |pairs-enter|
+  mappings.space       true; installs Space only for rules that need it
+  mappings.fast_wrap   false; set a shortcut such as '<M-e>'
+  max_scan_bytes       4096
+  treesitter           false
+  rainbow              see |pairs-rainbow|
+  surround             see |pairs-surround|
+  disabled_filetypes   { 'TelescopePrompt', 'snacks_picker_input' }
   pairs                single-character rules; false disables a rule
-  multi_pairs          opt-in language/custom rules, default {}
-  tex_environments     TeX environment name -> text/math/literal/false
-  filetypes            filetype -> rule/environment/enabled overrides
+  multi_pairs          {}; see |pairs-multi|
+  tex_environments     name -> text/math/literal/false; see |pairs-tex-env|
+  filetypes            filetype -> pairing/surround overrides
 
-Single-character rules:
-  close       printable ASCII closer; required for a new rule
-  open        insert a pair, default true
-  skip        skip a proven matching closer, default true
-  delete      remove adjacent empty pairs, default true
-  newline     expand on Enter, default true for asymmetric pairs
-  space       symmetric padding, default false; standard brackets only
-  skip_space  skip one space before a closer, default false; standard only
-  wrap        permit fast wrap, default true for standard brackets only
+Single-character rule fields:
+  close       printable ASCII closer; required for new/re-enabled rules
+  open        true
+  skip        true
+  delete      true
+  newline     true for asymmetric pairs; quotes never expand
+  space       false; standard brackets only
+  skip_space  false; standard brackets only
+  wrap        true for standard brackets only
 
-Closing delimiters must be unique. Symmetric quotes never expand on Enter.
-Re-enabling a single-character rule disabled with false requires its close.
-Overrides merge: defaults -> global -> filetype -> live buffer options: >lua
+Openers are single printable ASCII characters; closers must be unique.
+Options merge: defaults -> global -> filetype -> live buffer overrides: >lua
     vim.b.pairs_enabled = false
     vim.b.pairs_rules = { ['"'] = { open = false } }
     vim.b.pairs_multi_rules = { ['$$'] = false }
     vim.b.pairs_tex_environments = { proof = 'text' }
 <
-New delimiter/Space mappings need a setup-time global/filetype declaration or
-an explicitly composed mapping. Buffer-only rules do not install mappings.
+Declare new delimiters/Space rules globally or per filetype at setup time to
+install their mappings. Buffer overrides change behavior, not mappings.
 
 ==============================================================================
-SURROUND EDITING                                         *pairs-surround*
+SPACE PADDING                                            *pairs-space*
 
-Independent editing with mini.surround-style keys. Default off:
->lua
-    require('pairs').setup({ surround = { enabled = true } })
-<
-Disable mini.surround before using these same keys. Load on VeryLazy (or
-BufReadPost/BufNewFile), rather than only InsertEnter, for Normal-mode use.
-Existing global mappings are preserved; buffer mappings take precedence.
+Enable space=true on individual (), [] or {} rules. Here, │ is the cursor:
+  (│)        + Space -> ( │ )
+  ( │ )      + Space -> (  │ )
+  ( │ )      + <BS>  -> (│)
+  ( value│ ) + )     -> ( value )│   requires skip_space=true and skip=true
 
-Defaults:
-  sa{motion}{id}    Add surroundings to a motion/text object; saiw" -> "word"
-  sa_              Add to the line, keeping outer whitespace
-  Visual sa{id}    Add to the selection
-  sd{id}           Delete surroundings; sd) removes parentheses
-  sr{old}{new}     Replace surroundings; sr)" changes parentheses to quotes
-  sf{id} / sF{id}  Cycle through delimiter endpoints right / left
-  sh{id}           Temporarily highlight the delimiters
-  sn               Prompt for this buffer's search range
+Only the first space is mirrored. Paired <BS> requires exactly one ASCII space
+on each side; another <BS> removes the brackets. Enter trims padding before
+expanding. Manual padding behaves the same. delete/newline work independently
+of open. skip_space requires a matching same-line opener and one space before
+the closer; it works independently of space. Tabs/strings/comments stay
+native.
 
-Normal add/delete/replace use native operators: one undo step, redo, dot
-repeat and macros. Dot reuses the original delimiter/prompt answers at the
-new cursor. Visual edits do not install a new dot-repeat operation.
-User motion/text-object mappings, including mini.ai, remain available.
-Count before sa repeats output wrappers; count after sa belongs to the
-motion. For sd/sr/sf/sF/sh, a count selects the nth matching surrounding.
-Suffix l/n chooses the previous/next target, e.g. sdl), srn)".
+Multi-character rules also accept space=true. Specialized Python triples,
+${...} and LaTeX math require Tree-sitter; Markdown fences do not support it.
+Enter trims padding only when the rule's newline option is enabled.
 
-Identifiers:
-  ( [ { <       Padded output; trim inner edge whitespace on input
-  ) ] } >       Compact output; retain inner whitespace on input
-  " ' `         Same-character quotes; escapes are respected
-  b             Any ()/[]/{} on input, () on output
-  q             Any quote on input, double quotes on output
-  t             Nested HTML/XML tags; output prompts for tag and attributes
-  f             Function calls; output prompts for function name
-  ?             Prompt for literal left and right strings
-  other         Same character on both sides (including Unicode)
-
-With sr)?, enter the new left delimiter and press <CR>, then enter the new
-right delimiter and press <CR>. For example, sr)?【<CR>】<CR> replaces (word)
-with 【word】. Use sr?BEGIN<CR>END<CR>] to replace BEGINwordEND with [word].
-Prompted input delimiters are literal, including with treesitter=true, and
-must both be nonempty. <Esc> cancels either prompt without editing; dot repeat
-reuses the entered delimiters without prompting again.
-
-Tag search handles quoted attributes, same-name nesting, comments, HTML void
-elements and self-closing tags. Malformed/mismatched markup is not repaired.
-Function names accept ASCII identifiers and dotted chains. Searches are
-structural text searches; they do not classify comments or language semantics.
-
-Surround options (all in the surround table):
-  enabled                  false
-  treesitter               false; optional parsed string/comment protection
-  n_lines                  20 lines in either direction from the cursor
-  search_method            'cover'; innermost containing region
-  highlight_duration       500 milliseconds
-  respect_selection_type   false
-  max_scan_bytes           1048576; reject over-budget search windows
-  custom_surroundings      {}; identifier -> { input, output } or false
-  mappings                 add='sa', delete='sd', replace='sr', find='sf',
-                           find_left='sF', highlight='sh', update_n_lines='sn',
-                           suffix_last='l', suffix_next='n'
-
-search_method also accepts cover_or_next, cover_or_prev, cover_or_nearest,
-next, prev and nearest. Without a matching candidate or on <Esc>, no edit
-is made. Scan limits reject the complete search, not a truncated target.
-Search also rejects windows above 256 nested delimiters or 10,000 candidates.
-
-With respect_selection_type=false, selections get a single surrounding.
-With true, linewise selections use separate delimiter lines and add one
-indent level; blockwise selections surround each row by display columns.
-Tabs and wide characters at block boundaries are kept whole; short rows
-clamp to end-of-line. Deleting delimiters on otherwise blank lines removes
-those lines and dedents one level.
-
-Custom specifications are literal strings, not mini.surround Lua patterns:
->lua
-    surround = {
-      enabled = true,
-      custom_surroundings = {
-        ['*'] = {
-          input = { left = '**', right = '**' },
-          output = { left = '**', right = '**' },
-        },
-        L = {
-          output = function()
-            local name = vim.fn.input('LaTeX command: ')
-            if name == '' then return end
-            return { left = '\\' .. name .. '{', right = '}' }
-          end,
-        },
-      },
-    }
-<
-input/output may be callbacks returning { left=string, right=string } or nil
-to cancel. Input strings must be nonempty; output strings may be empty.
-Input callbacks may instead return one region or a list of regions:
->lua
-    {
-      left = { from = { 0, 0 }, to = { 0, 1 } },
-      right = { from = { 0, 6 }, to = { 0, 7 } },
-    }
-<
-Positions are {zero-based row, byte column}, with exclusive ends. Ranges must
-be ordered, disjoint, nonempty, within the bounded search window, and aligned
-to UTF-8 boundaries. A region callback runs again at the new cursor on dot.
-Callbacks receive context.buf, context.position={row,col}, context.cursor
-(byte offset in context.text), context.text, context.lines, context.first_row,
-context.starts (per-line byte offsets) and context.changedtick. Nil cancels.
-Returned regions use the same count/search/highlight logic as built-in pairs.
-Multiline strings are supported. Prompt answers are resolved before editing.
-Global options merge with filetypes.<ft>.surround and live buffer overrides:
->lua
-    vim.b.pairs_surround_config = { n_lines = 50 }
-    vim.b.pairs_surround_enabled = false
-<
-Mappings are setup-time global options. Buffer/filetype overrides control
-behavior; they do not install new mappings. PairsToggle and pairs_enabled
-also apply to surround; unmodifiable and special buffers pass through.
-
-Lua API: require('pairs.surround')
-  start(action, method)     Expression mapping API for add/delete/replace;
-                           returns native operator keys (replace_keycodes=true)
-  visual()                 Add after leaving Visual mode, using '< and '> marks
-  action(action, method)   find/find_left/highlight/update_n_lines
-  status()                 enabled, owned mapping count and conflicts
-
-<Plug>(pairs-surround-{action}) exists in Normal mode for each action name;
-add also exists in Visual mode. Search actions have -prev/-next variants.
-Set a default mapping to '' to use only its Plug binding. Surround mapping
-ownership is cleaned up on teardown without deleting replacement mappings.
-PairsSurround defaults to IncSearch and may be customized with nvim_set_hl.
-Custom literal rules retain literal matching, including shared multi_pairs
-definitions. There is no dependency on mini.surround or parsers by default.
-surround.treesitter=true (independent of automatic pairing's treesitter option)
-masks parsed strings/comments during bracket/function searches, preserving
-original text for whitespace trimming. Parsed quote targets include complete
-triple quote delimiters; string prefixes are retained. Template/f-string
-substitutions remain code. Tag searches retain their text tokenizer.
-Missing parsers use text matching. A pending tree requests a native time-sliced
-parse and cancels this invocation; no delayed edit is queued. Error/missing
-trees, 10,000 visited nodes or 256 levels reject the search. No parser is
-installed automatically. Custom region callbacks override built-in discovery.
+Space uses <nowait>. Set mappings.space=false if Space is a mapping prefix.
 
 ==============================================================================
-CUSTOM MULTI-CHARACTER RULES                              *pairs-multi*
+MULTI-CHARACTER RULES                                     *pairs-multi*
 
-multi_pairs also accepts literal user-defined pairs:
->lua
+Literal custom pairs, scoped by filetype: >lua
     require('pairs').setup({
       filetypes = {
         markdown = { multi_pairs = { ['**'] = {}, ['~~'] = {} } },
@@ -228,297 +104,298 @@ multi_pairs also accepts literal user-defined pairs:
       },
     })
 <
-Openers contain 2-64 printable ASCII bytes; closers 1-64. close defaults to
-the opener. Only the final opening character triggers insertion. A complete
-matching closer is reused; partial closers from standard auto-pairs are
-extended (typing [[ after [ inserted [] does not leave a third ]).
-Closers skip one typed character at a time after a complete pair is proven.
-Empty-pair Backspace deletes both delimiters, as one undoable edit.
-
-Generic rule options:
-  close       string, defaults to the opener
+Options and defaults:
+  close       opener itself
   open        true
   skip        true
   delete      true
-  newline     false; true enables indented empty-pair expansion
-  space       false; true enables one mirrored space and paired removal
-  contexts    { 'code' }; optionally include 'string' and/or 'comment'
-  condition   optional function(ctx, action) returning true to permit action
-  surround    optional one-character identifier for shared surround strings
+  newline     false; indented empty-pair expansion
+  space       false; mirrored padding
+  contexts    { 'code' }; may include 'string' and 'comment'
+  condition   function(ctx, action) -> true to permit an action; optional
+  surround    one-character identifier shared with |pairs-surround|; optional
 
-condition runs after context/boundary guards; it can restrict, not override,
-them. Actions are open/skip/delete/newline/space. ctx includes filetype, line,
-row and col (zero-based byte positions) and optional parser context. Errors
-cancel the custom action. Conditions are not serialized by PairsTrace exports;
-restore them manually when reproducing. Parse-pending states never call them.
-Use condition=function(ctx) return not ctx.fence end for markup rules which
-should exclude parsed Markdown fences. Filetype scope avoids interpreting code
-operators such as ** or << as prose markup.
+The final opener character inserts the closer, reusing existing closers and
+extending partial ones. Proven closers skip one character at a time. <BS>
+deletes empty pairs. Undo/redo/dot include padding and multiline expansion.
 
-Generic discovery is literal and bounded by max_scan_bytes. Up to 32 lines,
-including the current line, provide a snapshot for closing-key proof after
-Enter. Existing parsed current-line prefix masking is respected. Origin context
-uses line-local lexical evidence (or the current parser context); this is not
-a full grammar for arbitrary delimiter families. Escaped openers are ignored.
-Pure decisions render native keys: undo/redo and dot replay include insertion,
-deletion, padding and multiline expansion. Native comment leaders are cleared
-before recorded indentation so expanding /* */ does not duplicate '*'.
+Openers are 2-64 printable ASCII bytes; closers 1-64. At most 128 rules may be
+declared. Generic openers cannot prefix each other or overlap specialized
+families; generic closers must be unique. Markdown ~~ may coexist with ~~~: a
+third tilde upgrades an empty pair on a parser-confirmed fence line. Longer
+quote/fence runs use the three-character family.
 
-At most 128 multi-character rules can be declared. Generic opening delimiters
-cannot be prefixes of each other or overlap active specialized families; their
-closing delimiters must be unique. An exception allows Markdown ~~ alongside
-~~~: the third tilde on a parser-confirmed empty fence line upgrades the ~~
-pair to a ~~~ opener. Python triple quotes, JS interpolation, Markdown fences
-and TeX math retain their existing rules, precedence, guards
-and defaults. Longer quote/fence runs use the three-character base family.
-New delimiters must be declared globally or for a filetype at setup to install
-their trigger and closing-character mappings. Buffer overrides change policy.
+contexts/condition apply only to generic rules. condition runs after safety
+guards and cannot override them; errors cancel the action. action is one of
+open/skip/delete/newline/space. ctx provides filetype, line, row/col
+(zero-based bytes) and available parser context. To exclude parsed Markdown
+fences, use condition=function(ctx) return not ctx.fence end. Conditions are
+not exported by |pairs-trace|.
 
-Rule surround='*' imports {left=opener,right=closer} into |pairs-surround| for
-that identifier, using the effective filetype/buffer multi rule. Explicit
-custom_surroundings win, including false to disable an identifier. Auto-pair
-action flags do not disable explicit surround operations. Shared definitions
-do not enable the surround module or its mappings automatically.
+Discovery is literal, ignores escaped openers and uses max_scan_bytes with up
+to 32 lines for closing proof. Context detection is lexical/parser evidence,
+not a grammar for arbitrary delimiters. Scope markup rules by filetype to
+avoid pairing code operators such as ** or <<.
+
+surround='*' shares the effective opener/closer with that surround identifier.
+Explicit custom_surroundings take precedence, including false. Pairing action
+flags do not disable explicit surround edits; sharing does not enable
+surround.
 
 ==============================================================================
-RAINBOW BRACKETS                                         *pairs-rainbow*
+SURROUND EDITING                                         *pairs-surround*
 
-Enabled by default for (), [] and {}. Nested brackets cycle through seven
-colors; matching closers use the same color across lines. Unmatched closers
-keep their ordinary syntax color. Quotes are not colored. Rainbow highlighting
-is independent of pairing enable/disable/toggle, pairing rules and treesitter.
-Disabled filetypes, filetypes[ft].enabled=false and special buffers are excluded.
+Enable with setup({ surround = { enabled = true } }). Disable mini.surround if
+it owns the same keys. Load on BufReadPost/BufNewFile or VeryLazy for Normal
+mode use. Existing global mappings are preserved; buffer mappings win.
 
-Disable globally with rainbow.enabled=false in setup. Toggle the current buffer
-with :PairsRainbowToggle or require('pairs.rainbow').toggle(bufnr). Set
-b:pairs_rainbow=false to suppress coloring; this is checked on each redraw.
-The toggle function also refreshes the current display and starts a fresh scan.
-To enable colors before the first InsertEnter, load the plugin on BufReadPost
-and BufNewFile instead. Calling setup again cancels pending work and rebuilds
-the displayed buffers; teardown clears the provider, timers and cached data.
+Default keys:
+  sa{motion}{id}    Add; saiw" surrounds a word with quotes
+  sa_              Add around a line, keeping outer whitespace
+  Visual sa{id}    Add around the selection
+  sd{id}           Delete; sd) removes parentheses
+  sr{old}{new}     Replace; sr)" changes parentheses to quotes
+  sf{id} / sF{id}  Cycle delimiter endpoints right / left
+  sh{id}           Highlight delimiters temporarily
+  sn               Set this buffer's search range
 
-Options under rainbow (only overrides are needed):
-  enabled                default true
-  debounce_ms            edit debounce delay, default 20; zero is allowed
-  budget_ms              soft background slice budget, default 2
-  max_lines              default 100000
-  max_bytes              default 2097152 (2 MiB, including line endings)
-  max_line_bytes         default 10000
-  max_depth              default 256
-  max_brackets           cached bracket character limit, default 100000
-  max_visible_brackets   per-window redraw limit, default 2000
-  priority               highlight priority, default 110
-  highlights             nonempty list of highlight group names
+Identifiers:
+  ( [ { <       Padded output; trim inner edge whitespace on input
+  ) ] } >       Compact output; retain inner whitespace on input
+  " ' `         Quotes; respect escapes
+  b / q         Any standard bracket / quote on input; () / "" on output
+  t / f         HTML/XML tag / function call; prompt on output
+  ?             Prompt for literal left and right strings
+  other         Same character on both sides, including Unicode
 
-The default highlight groups, in order, are:
-  PairsRainbowRed, PairsRainbowYellow, PairsRainbowBlue, PairsRainbowOrange,
-  PairsRainbowGreen, PairsRainbowViolet, PairsRainbowCyan.
-Customize them with nvim_set_hl(), or replace highlights with your own groups.
-ColorScheme events restore default groups without overwriting explicit colors.
+Examples: sr)?【<CR>】<CR> changes (word) to 【word】; sr?BEGIN<CR>END<CR>]
+changes BEGINwordEND to [word]. Input delimiters must be nonempty and stay
+literal with Tree-sitter. <Esc> cancels without editing.
 
-The lexer recognizes ordinary quotes and common line comments, Lua long
-strings/comments, Python triple strings, C-style block comments (nested in
-Rust/Swift), Rust raw strings/lifetimes, Go raw strings and nested JavaScript
-template expressions. Markdown/plain text use literal bracket nesting. Regex
-literals, JSX, language injections, TeX verbatim environments, heredocs and other
-specialized language constructs are not parsed. Use a dedicated parser-based
-highlighter when their exact syntax is required; disable this feature there.
+Normal edits support undo/redo, dot repeat and macros; dot reuses identifiers
+and prompt answers. Visual edits do not set a new dot operation. Custom motion
+mappings work. A count before sa repeats wrappers; after sa it counts the
+motion. Other actions select the nth surrounding. Suffix l/n selects the
+previous/next target, e.g. sdl), srn)".
 
-Line-boundary state is cached. Editing callbacks only invalidate state and queue
-work. Background slices scan at most 128 lines, checking the time budget after
-each line; the budget is soft (one line, cache maintenance and GC can exceed it).
-Line splices align the cached suffix outside the input callback. Scanning stops
-once state converges after all changed lines. Large replacements and bursts of
-more than 16 pending splices reset the cache. Rendering reads valid cached rows
-and emits ephemeral highlights only for visible lines; it never scans or parses.
-The paint cap bounds decoration calls for unusually dense windows. Hidden buffers
-release their cache and rebuild on display. Pending/invalid rows use normal
-syntax colors until scanning reaches them.
+Options under surround:
+  enabled                  false
+  treesitter               false; independent of automatic pairing
+  n_lines                  20 in either direction
+  search_method            'cover'; innermost surrounding at the cursor
+  highlight_duration       500 ms
+  respect_selection_type   false
+  max_scan_bytes           1048576
+  custom_surroundings      {}; identifier -> { input, output } or false
+  mappings                 add='sa', delete='sd', replace='sr', find='sf',
+                           find_left='sF', highlight='sh',
+                           update_n_lines='sn', suffix_last='l',
+                           suffix_next='n'
 
-Exceeding a buffer limit clears its rainbow colors, preserving automatic pairing.
-An edit retries the scan so shrinking a buffer recovers automatically. Inspect
-require('pairs.rainbow').status(bufnr) for enabled, pending, reason, valid_lines,
-scanned_lines, brackets, slices, work_ms and max_slice_ms. Reasons include
-line_count_limit, byte_limit, line_length_limit, depth_limit and bracket_limit.
-Counters are cumulative since buffer attachment; work_ms measures background
-work, excluding timers, actual UI rendering and input dispatch.
+search_method also accepts cover_or_next, cover_or_prev, cover_or_nearest,
+next, prev and nearest.
+No candidate, an unsafe tree or a scan limit cancels the operation. Searches
+reject more than 256 nested delimiters, 10,000 candidates/visited syntax
+nodes, or an over-budget window. Tags handle nesting, quoted attributes,
+comments, void/self-closing elements; malformed markup is not repaired.
+Functions accept ASCII identifiers/dotted chains. Tag matching remains
+text-based.
 
-==============================================================================
-SPACE PADDING                                            *pairs-space*
+With respect_selection_type=true, linewise edits use separate delimiter lines
+and one indent level; blockwise edits wrap each row by display columns without
+splitting tabs/wide characters. Short rows clamp to EOL. Deleting
+delimiter-only lines removes them and dedents once. The default wraps a
+selection as one span.
 
-Disabled by default. Enable per standard bracket: >lua
+Custom input/output use literal strings (not mini.surround Lua patterns): >lua
     require('pairs').setup({
-      pairs = {
-        ['('] = { space = true },
-        ['['] = { space = true },
-        ['{'] = { space = true },
+      surround = {
+        enabled = true,
+        custom_surroundings = {
+          ['*'] = {
+            input = { left = '**', right = '**' },
+            output = { left = '**', right = '**' },
+          },
+        },
       },
     })
 <
-Here and below, | marks the insertion cursor:
-  (|)   + Space -> ( | )
-  ( | ) + Space -> (  | )
-  ( | ) + BS    -> (|)
-
-Only the first space is mirrored. Further spaces insert normally. Paired BS
-requires exactly one ASCII space on each side; another BS removes the empty
-brackets. Enter trims padding before expanding. Identical manual padding works
-the same way. delete/newline control removal/Enter independently of open.
-
-Set skip_space=true separately on a standard bracket rule:
-  ( value| ) + ) -> ( value )|
-This requires skip=true, a matching same-line opener, and exactly one ASCII
-space before the closer. It works independently of space. Both options default
-to false. Space/paired BS apply only to empty brackets; tabs, strings and
-comments use ordinary input.
-
-The Space mapping uses <nowait> to avoid waiting for a longer mapping. To use
-Space as a mapping prefix, set mappings.space=false.
-
-Multi-character rules use the same space=true option: >lua
-    multi_pairs = { ['\\('] = { space = true } }
+Either field may be a callback returning { left=string, right=string } or nil
+to cancel. Multiline strings work; only output strings may be empty. Input
+callbacks may instead return one region or a list: >lua
+    local region = {
+      left = { from = { 0, 0 }, to = { 0, 1 } },
+      right = { from = { 0, 6 }, to = { 0, 7 } },
+    }
 <
-Supports Python triples, ${...} and LaTeX $$, \(...\), \[...\]; requires
-treesitter=true and an installed parser. Same-line empty pairs gain one space
-on each side; BS removes exactly that padding. Enter trims it only if the
-rule's newline is enabled, preserving the family's indentation. Defaults to
-false. Markdown fences do not support space=true.
+Ranges use zero-based {row, byte_col}, exclusive ends. They must be ordered,
+disjoint, nonempty, inside the search window and aligned to UTF-8 boundaries.
+Region callbacks run again on dot and override built-in discovery. Callback
+context fields: buf, position={row,col}, cursor (byte offset in text), text,
+lines, first_row, starts (line byte offsets), changedtick.
+
+Behavior merges with filetypes.<ft>.surround and b:pairs_surround_config.
+b:pairs_surround_enabled=false disables it per buffer; PairsToggle and
+pairs_enabled also apply. Mappings are global setup-time options. Set a key to
+'' to use only <Plug>(pairs-surround-{action}); add also has a Visual binding,
+and search actions have -prev/-next variants. Customize PairsSurround with
+nvim_set_hl() (default IncSearch).
+
+surround.treesitter=true protects parsed strings/comments in bracket/function
+searches and selects complete quotes, including triples. String prefixes stay;
+template substitutions remain code. Literal rules keep literal matching.
+Missing parsers use text search; pending/error trees cancel without a delayed
+edit. No parser is installed automatically.
+
+API in require('pairs.surround'):
+  start(action, method)   Operator keys for add/delete/replace; expression
+                         mappings require replace_keycodes=true
+  visual()               Add using '< and '> marks after leaving Visual mode
+  action(action, method) find/find_left/highlight/update_n_lines
+  status()               Enabled state, owned mappings and conflicts
 
 ==============================================================================
 FAST WRAP                                                *pairs-fast-wrap*
 
-Opt into an Insert-mode shortcut: >lua
-    require('pairs').setup({ mappings = { fast_wrap = '<M-e>' } })
-<
-Invoke immediately after (, [ or { to wrap the next same-line target:
-  (|value       -> (value)|
-  (|obj.value   -> (obj.value)|
-  (|)fn(a, b)   -> (fn(a, b))|
-A matching closer can be inserted, reused after the target, or moved from an
-adjacent empty pair. No shortcut is installed by default. Use a recognized
-non-text key; BS/CR/Tab/Escape cannot be the shortcut. Existing owners win.
+Set mappings.fast_wrap='<M-e>' (default false), then invoke after (, [ or {:
+  (│value       -> (value)│
+  (│obj.value   -> (obj.value)│
+  (│)fn(a, b)   -> (fn(a, b))│
 
-Targets are ASCII identifiers, dotted chains, or one adjoining complete (...)
-call. Nested standard brackets, ordinary quoted strings and Unicode arguments
-are supported. Incomplete/mismatched calls, indexing, call chaining, comments,
-advanced literals and ambiguous JS/TS/Ruby/Swift slash expressions do not
-wrap. Prefix and target share max_scan_bytes. Per-rule wrap=false disables
-wrapping. Undo/redo/dot are preserved; dot replays the original movement
-length.
+Wraps an ASCII identifier, dotted chain or one complete adjoining call on the
+same line. Reuses/moves an existing closer. Nested brackets, ordinary strings
+and Unicode arguments work. Incomplete calls, indexing, chained calls,
+comments, advanced literals and ambiguous slash expressions pass through.
 
-fast_wrap() and expr('<FastWrap>') return keycodes or nil for caller fallback.
-<FastWrap> is a logical API action, not a physical key. Preview with
-:PairsInspect <FastWrap>. See |pairs-api| for composed mappings.
+Prefix and target share max_scan_bytes; wrap=false disables a bracket rule.
+Use a recognized non-text shortcut other than BS/CR/Tab/Escape. Existing
+mappings win. Undo/redo work; dot replays the original movement length.
+<FastWrap> is a logical API action; inspect with :PairsInspect <FastWrap>.
+
+==============================================================================
+RAINBOW BRACKETS                                         *pairs-rainbow*
+
+On by default for (), [] and {}. Nested brackets cycle through seven colors
+across lines; quotes/unmatched closers keep ordinary syntax colors. Rainbow is
+independent of pairing toggles/rules and Tree-sitter. Disabled filetypes,
+filetypes[ft].enabled=false and special buffers are excluded.
+
+Use rainbow.enabled=false globally, b:pairs_rainbow=false per buffer, or
+:PairsRainbowToggle. Load on BufReadPost/BufNewFile for colors before editing.
+Options under rainbow:
+  enabled                true
+  debounce_ms            20; zero allowed
+  budget_ms              2; soft background slice budget
+  max_lines              100000
+  max_bytes              2097152 (2 MiB, including line endings)
+  max_line_bytes         10000
+  max_depth              256
+  max_brackets           100000
+  max_visible_brackets   2000 per window
+  priority               110
+  highlights             nonempty list of highlight group names
+
+Default groups: PairsRainbowRed, PairsRainbowYellow, PairsRainbowBlue,
+PairsRainbowOrange, PairsRainbowGreen, PairsRainbowViolet, PairsRainbowCyan.
+Customize with nvim_set_hl(), or supply highlights. ColorScheme preserves
+explicit colors.
+
+A separate lexer handles common strings/comments, raw/triple strings and
+nested JS templates; Markdown/plain text use literal nesting. Regex, JSX,
+injections, TeX verbatim and heredocs are not parsed exactly. Disable rainbow
+where those constructs require a parser-based highlighter.
+
+Scanning runs in background slices; rendering uses cached visible rows.
+Pending rows keep normal colors. Exceeding a limit clears rainbow only; later
+edits retry. Hidden buffers release their cache.
+require('pairs.rainbow').toggle(bufnr) refreshes the display; status(bufnr)
+reports enabled, pending, reason, valid_lines, scanned_lines, brackets,
+slices, work_ms and max_slice_ms. Counters accumulate since attachment;
+timings exclude UI/input dispatch.
 
 ==============================================================================
 LANGUAGE RULES
 
-All rules below are opt-in and require treesitter=true with the appropriate
-installed parser. Declare multi_pairs globally or under filetypes[ft].
-Precedence is global -> filetype -> b:pairs_multi_rules. An empty table
-enables a rule; false disables it. Closers are implicit. Independent open,
-skip, delete and newline flags default to true except where noted below.
+Opt-in rules below require treesitter=true and installed parsers. Declare
+multi_pairs globally or under filetypes[ft]: {} enables, false disables.
+open/skip/delete/newline default true except where noted; closers are
+implicit.
 
 PYTHON TRIPLE QUOTES                                      *pairs-triples*
-
-For filetype python: >lua
-    filetypes = {
-      python = {
-        multi_pairs = {
-          [string.rep('"', 3)] = {},
-          [string.rep("'", 3)] = {},
-        },
-      },
-    }
+>lua
+    require('pairs').setup({
+      treesitter = true,
+      filetypes = { python = { multi_pairs = {
+        [string.rep('"', 3)] = {}, [string.rep("'", 3)] = {},
+      } } },
+    })
 <
-Typing the third identical quote after an empty string creates a triple pair.
-Python string prefixes are supported. Closing quotes skip one at a time; BS
-removes an adjacent empty triple; Enter creates body/closing lines aligned
-with the opener. Missing/pending syntax retains ordinary quote behavior.
+The third quote upgrades an empty string to a triple pair, including prefixed
+strings. Closers skip one quote at a time; <BS> deletes empty triples; Enter
+creates aligned body/closing lines. Missing/pending syntax keeps ordinary
+quote behavior.
 
-JAVASCRIPT / TYPESCRIPT TEMPLATES                         *pairs-templates*
+JS/TS TEMPLATES                                           *pairs-templates*
 
-For javascript/javascriptreact/typescript/typescriptreact: >lua
+Use this table as filetypes[ft] for javascript/javascriptreact/typescript/
+typescriptreact: >lua
     local templates = {
       pairs = { ['`'] = { close = '`' } },
       multi_pairs = { ['${'] = {} },
     }
-    -- Use templates as filetypes[ft] for each desired JS/TS filetype.
 <
-Backticks pair templates (including tagged templates) and skip real closers.
-In template text, { after an unescaped $ creates ${|}; ordinary literal quotes
-and braces stay native. Interpolation bodies use normal code pairing.
-BS in ${|} removes all three characters; Enter expands the empty expression.
-Enter inside template text stays native. Backticks use single-character
-open/skip/delete flags; interpolation uses the multi-character flags.
+Backticks pair templates, including tagged templates. In template text,
+{ after an unescaped $ creates ${│}; other quotes/braces stay native.
+Substitutions use code pairing. <BS> deletes empty ${}; Enter expands it,
+but stays native in template text. Backticks use single-character rule flags.
 
-MARKDOWN CODE FENCES                                      *pairs-fences*
+MARKDOWN FENCES                                          *pairs-fences*
 
-For markdown: >lua
-    filetypes = {
-      markdown = { multi_pairs = { ['```'] = {}, ['~~~'] = {} } },
-    }
-<
-Enter after a new fence of at least three backticks/tildes and optional info
-creates a blank body and matching closing fence. The opening length,
-indentation and list/blockquote continuation are retained. Both open and
-newline must be true. Closing fences skip one character at a time at proven
-closing positions. Existing code, inline code and invalid fence positions
-retain ordinary input. Backspace stays native; delete=true is unsupported.
-Inline backticks are not paired by this option.
+Set filetypes.markdown.multi_pairs to { ['```'] = {}, ['~~~'] = {} }. Enter
+after a new fence of at least three backticks/tildes creates body and closing
+lines, preserving fence length, info, indentation and list/quote continuation.
+Both open/newline must be true. Closers skip at proven positions. Existing
+code, invalid positions and Backspace stay native; delete=true and space=true
+are unsupported. Inline backticks are not paired.
 
 LATEX MATH                                               *pairs-tex*
                                                          *pairs-tex-slash*
-For tex/plaintex with the latex parser: >lua
-    local math = { multi_pairs = {
-      ['$$'] = {}, ['\\('] = {}, ['\\['] = {},
-    } }
-    -- Use math as filetypes.tex and/or filetypes.plaintex.
-<
-  $|    + $   -> $$|$$       only on an otherwise blank/indented line
-  |     + \(  -> \(|\)
-  |     + \[  -> \[|\]
-Closing delimiters skip one character at a time, including their backslash.
-BS removes adjacent empty pairs. Enter expands empty $$ and \[ pairs;
-\( has newline=false by default. Single-dollar inline math is not paired.
-Comments, existing math, literal code and unknown contexts remain protected.
+For tex/plaintex with the latex parser, set multi_pairs to:
+{ ['$$'] = {}, ['\\('] = {}, ['\\['] = {} }.
+  $│ + $  -> $$│$$    only on a blank/indented line
+  │  + \( -> \(│\)
+  │  + \[ -> \[│\]
+Closers skip one character at a time, including backslashes. <BS> deletes
+empty pairs. Enter expands $$ and \[; \( defaults to newline=false.
+Single-dollar math is not paired. Comments, existing math and literal/unknown
+contexts stay protected.
 
-LATEX ENVIRONMENTS                                       *pairs-tex-env*
+LATEX CONTEXT                                            *pairs-tex-env*
+                                                         *pairs-tex-args*
 
-Extend known environment modes globally, per filetype or buffer: >lua
-    tex_environments = {
-      theorem = 'text', proof = 'text', mymath = 'math', mycode = 'literal',
-    }
-<
-text allows configured math at valid boundaries; math suppresses math
-delimiter pairing; literal keeps all plugin-owned keys native. false removes a
-custom/text declaration. Names match exactly, including star suffixes (no
-wildcards), and use 1-62 ASCII letters/digits or _, ., :, -, * characters.
-Built-in math/raw protections cannot be weakened or removed. Inner text cannot
-lift an outer restriction. Environment declarations do not enable delimiter
-rules.
+Set tex_environments globally, per filetype or buffer, e.g. { theorem='text',
+mymath='math', mycode='literal' }. text allows configured math at valid
+boundaries; math suppresses math pairing; literal keeps keys native. false
+removes custom/text declarations. Built-in math/raw restrictions cannot be
+weakened, including by inner text. Names match exactly (star suffixes
+included): 1-62 ASCII letters/digits or _, ., :, -, *. These declarations do
+not enable delimiter rules.
 
-LATEX COMMAND ARGUMENTS                                  *pairs-tex-args*
-
-Built-in text arguments (section headings, textbf/textit/textrm/textsf/texttt/
-textnormal/emph/underline) allow ordinary pairs and configured inline \( math;
-display math openings stay native. Heading optional titles count as text.
-url/nolinkurl/path and href's first mandatory argument keep payload keys
-native; href's second mandatory argument is text. Outer argument delimiters
-still use normal pair rules. User-defined command profiles are not
-configurable.
+Headings and textbf/textit/textrm/textsf/texttt/textnormal/emph/underline
+allow ordinary pairs and configured inline \( math; display math stays native.
+Optional heading titles are text. url/nolinkurl/path and href's first argument
+stay literal; href's second argument is text. Outer argument delimiters use
+normal pairing. Command profiles are not configurable.
 
 ==============================================================================
 ENTER AND COMPLETION                                     *pairs-enter*
 
-Enter between adjacent empty brackets creates an indented middle line and a
-closing line. Uses indentexpr/cindent, otherwise shiftwidth; tabs are
-respected. Nonempty pairs and ordinary newlines pass through. Undo/redo/dot
-are preserved.
+Enter expands empty brackets using indentexpr/cindent, otherwise shiftwidth.
+Nonempty pairs pass through. Undo/redo/dot are supported.
 
 If completion owns Enter, set mappings.cr=false and compose expr('<CR>') after
-completion acceptance, before native fallback. For blink.cmp: >lua
-    keymap = {
+acceptance. For blink.cmp: >lua
+    local keymap = {
       ['<CR>'] = {
         'accept',
         function() return require('pairs').expr('<CR>') end,
@@ -526,88 +403,80 @@ completion acceptance, before native fallback. For blink.cmp: >lua
       },
     }
 <
-Completion/snippet buffer edits are not re-paired. Existing global mappings
-are preserved; buffer mappings take precedence. Disable competing auto-pairs
-plugins.
+Completion/snippet buffer edits are not re-paired.
 
 ==============================================================================
 API                                                      *pairs-api*
 
-All functions below are in require('pairs'):
+Functions in require('pairs'):
   setup(opts)         Validate options and install non-conflicting mappings.
-  expr(key)           Return handled keycodes, or nil for caller fallback.
-  handle(key)         Return handled or original keycodes; logical FastWrap
-                      falls back to an empty string.
-  fast_wrap()         Return wrap keycodes, or nil for caller fallback.
-  explain(key, opts)  Return action/reason without editing. Insert mode by
-                      default; opts.assume_insert=true previews insertion
-                      before the Normal-mode cursor.
-  enable([bufnr])     Enable globally, or for one buffer (0 = current).
-  disable([bufnr])    Disable globally, or for one buffer.
-  toggle([bufnr])     Toggle globally, or for one buffer.
+  expr(key)           Handled keycodes, or nil for fallback.
+  handle(key)         Handled/original keycodes; FastWrap fallback is ''.
+  fast_wrap()         Wrap keycodes, or nil for fallback.
+  explain(key, opts)  Action/reason without editing. opts.assume_insert=true
+                      previews insertion before the Normal-mode cursor.
+  enable([bufnr])     Enable globally or per buffer (0 = current).
+  disable([bufnr])    Disable globally or per buffer.
+  toggle([bufnr])     Toggle globally or per buffer.
   status()            Initialization, enabled state and mapping conflicts.
-  teardown()          Remove only mappings still owned by this plugin.
+  teardown()          Remove only mappings still owned by the plugin.
 
-Use '<BS>', '<CR>', '<Space>' or logical '<FastWrap>' for special actions.
-Disable the relevant owned mapping when composing your own, e.g.
-mappings.space=false or mappings.enabled=false. Use expression mappings with
-replace_keycodes=false. Returned keycodes do not edit the buffer by
-themselves. Preceding input may still be queued: see |map-expression| for the
-<Ignore> pattern used by the plugin's private expression mappings.
+Special keys: '<BS>', '<CR>', '<Space>', logical '<FastWrap>'. For composed
+expression mappings, disable the corresponding plugin mapping and use
+replace_keycodes=false. Returned keys do not edit by themselves. Queued input
+may require the <Ignore> pattern; see |map-expression|.
 
 COMMANDS                                                 *pairs-commands*
 
-  :PairsToggle         Toggle globally.
+  :PairsToggle         Toggle automatic pairing and surround globally.
+  :PairsRainbowToggle  Toggle rainbow in this buffer.
   :PairsInspect {key}  Explain insertion before the cursor without editing.
-  :checkhealth pairs   Check initialization and setup-time mapping conflicts.
+  :checkhealth pairs   Check setup and mapping conflicts.
 
 TRACE                                                    *pairs-trace*
 
-After loading, capture an actual mispair: >vim
+After loading the plugin: >vim
     PairsTrace clear
     PairsTrace start
-    " Reproduce while editing, then return to Normal mode.
+    " Reproduce the issue, then leave Insert mode.
     PairsTrace stop
     PairsTrace show
     PairsTrace export /tmp/pairs-trace.json
 <
-Tracing is off by default. It records actual expr()/handle() decisions, not
-explain()/PairsInspect queries or keys handled entirely by completion. The
-latest 100 entries contain the key, pre-edit byte cursor, nearby text (capped
-at 4096 bytes), effective rules and available syntax state. show opens a
-readonly scratch split; stop retains entries; clear resets them. Export is
-explicit/local. Use :PairsTrace! export {file} to overwrite. JSON positions
-are zero-based rows/byte columns. Surrounding lines, parser state, indentation
-callbacks and mapping owners are not serialized; add context when reproducing
-multiline issues. Observed output is not an expected assertion.
+Off by default. Records the last 100 expr()/handle() decisions: key, pre-edit
+byte cursor, nearby text (up to 4096 bytes), rules and available syntax state.
+Queries/completion-owned keys are excluded. show opens a readonly split;
+stop retains entries; clear resets them. Export is local/explicit; use
+:PairsTrace! export {file} to overwrite. Positions are zero-based rows/byte
+columns.
+Add missing surrounding lines, parser/indentation context and mapping owners
+when reproducing. Recorded output is an observation, not an assertion.
 
-Lua API in require('pairs.trace'): start(), stop(), clear(), entries(),
-status(), show(), export(path[, overwrite]). entries() returns independent
-chronological copies. teardown stops tracing and retains records.
+require('pairs.trace'): start(), stop(), clear(), entries(), status(), show(),
+export(path[, overwrite]). entries() returns chronological copies; teardown
+stops tracing without clearing them.
 
-BENCHMARK                                                *pairs-bench*
+TESTS AND BENCHMARKS                                      *pairs-bench*
 
-From the checkout, run ./tests/run.sh or ./tests/bench.sh. Optional pinned
-parser fixtures: tests/install-parsers.sh /tmp/pairs-parsers, then set
-PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers. Benchmarks measure headless
-decisions and mapped input, excluding screen/keyboard latency. See
-docs/BENCHMARKS.md for options, methodology and measured results; docs/PLAN.md
-for implementation notes.
+Run ./tests/run.sh; benchmarks: ./tests/bench.sh and ./tests/bench-rainbow.sh.
+Optional fixtures: tests/install-parsers.sh /tmp/pairs-parsers, then set
+PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers. Set NVIM_BIN to choose an
+executable. Tests print colored summaries and full diagnostics on failure;
+NO_COLOR=1 disables colors, FORCE_COLOR=1 forces them unless NO_COLOR is set.
+Benchmarks exclude screen/keyboard latency. See docs/BENCHMARKS.md for options
+and results, docs/PLAN.md for implementation notes.
 
 LIMITS                                                   *pairs-limits*
 
-The fallback lexer is line-local and recognizes basic strings/common comments.
-With treesitter=true, installed parsers protect multiline/raw strings and
-block comments, while supported interpolation expressions remain code. Missing
-parsers fall back to the lexer. Pending/unsafe syntax, malformed prefixes,
-scan-budget limits and context errors pass keys through. Parsing is
-time-sliced; the plugin does not wait for completion, install parsers or start
-Tree-sitter highlighting. Rainbow coloring uses a separate lexer; see
-|pairs-rainbow| for its scope and limits.
+The fallback lexer handles line-local strings/common comments. Tree-sitter
+protects multiline/raw strings and block comments; supported substitutions
+remain code. Missing parsers use the lexer. Pending/unsafe syntax, malformed
+prefixes, scan limits and context errors pass keys through. Parsing is
+asynchronous; the plugin neither installs parsers nor starts highlighting.
+Rainbow uses its own lexer; see |pairs-rainbow|.
 
 Paste, macro recording/replay, Replace mode and special buffers bypass
-pairing. Use |pairs-surround| for explicit motion/selection wrapping.
-Generic multi-character rules are bounded literal rules; command-line
-auto-pairing is not supported. See README.md for installation.
+pairing. Use |pairs-surround| for explicit wrapping. Command-line auto-pairing
+is unsupported. See README.md for installation.
 
  vim:tw=78:ts=8:ft=help:norl:
