@@ -3,6 +3,7 @@ local uv = vim.uv
 local stdin, stdout, stderr = uv.new_pipe(false), uv.new_pipe(false), uv.new_pipe(false)
 local replies, cells, attributes, errors = {}, {}, {}, {}
 local next_id, exited = 0, false
+local on_frame
 local child = assert(uv.spawn(vim.v.progpath, {
   args = { "--embed", "--headless", "-u", "NONE", "-i", "NONE" },
   stdio = { stdin, stdout, stderr },
@@ -30,6 +31,22 @@ stdout:read_start(function(err, data)
               attributes[args[1]] = args[2]
             elseif event[1] == "grid_clear" then
               cells[args[1]] = {}
+            elseif event[1] == "grid_scroll" then
+              local grid, top, bottom, left, right, rows, cols = unpack(args)
+              local previous = vim.deepcopy(cells[grid] or {})
+              for row = top, bottom - 1 do
+                cells[grid][row] = cells[grid][row] or {}
+                for col = left, right - 1 do
+                  local source_row, source_col = row + rows, col + cols
+                  cells[grid][row][col] = source_row >= top
+                      and source_row < bottom
+                      and source_col >= left
+                      and source_col < right
+                      and previous[source_row]
+                      and previous[source_row][source_col]
+                    or nil
+                end
+              end
             elseif event[1] == "grid_line" then
               local grid, row, col, last_hl = args[1], args[2], args[3], 0
               cells[grid] = cells[grid] or {}
@@ -41,6 +58,8 @@ stdout:read_start(function(err, data)
                   col = col + 1
                 end
               end
+            elseif event[1] == "flush" and on_frame then
+              on_frame()
             end
           end
         end
@@ -115,6 +134,57 @@ local ok, err = xpcall(function()
   lua("vim.api.nvim_buf_set_lines(0, 1, 2, false, {''})")
   ready()
   expect(2, 2, 0xe06c75)
+  -- Delay scanning to inspect every intermediate Insert-mode frame. Previously
+  -- the entire suffix lost its colors until the debounce timer fired.
+  lua([[
+    vim.api.nvim_buf_set_lines(0, 0, -1, false, {'{', '  ([])', '}'})
+    require('pairs').setup({mappings = {enabled = false}, rainbow = {debounce_ms = 1000}})
+    vim.api.nvim_win_set_cursor(0, {2, 3})
+    vim.cmd('vsplit')
+  ]])
+  ready()
+  local frames, bad_frames = 0, {}
+  local bracket_colors = {
+    ["{"] = 0xe06c75,
+    ["}"] = 0xe06c75,
+    ["("] = 0xe5c07b,
+    [")"] = 0xe5c07b,
+    ["["] = 0x61afef,
+    ["]"] = 0x61afef,
+  }
+  on_frame = function()
+    frames = frames + 1
+    for row = 0, 4 do
+      for col, cell in pairs(cells[1][row] or {}) do
+        local color = bracket_colors[cell.text]
+        if color and fg(row, col) ~= color then
+          bad_frames[#bad_frames + 1] =
+            string.format("%s at %d:%d lost its color", cell.text, row, col)
+        end
+      end
+    end
+  end
+  request("nvim_input", { "i" })
+  for _, keys in ipairs({ "a", "你", "b", "<BS>", "<BS>", "<CR>", "<BS>", "c" }) do
+    request("nvim_input", { keys })
+    assert(lua("vim.cmd('redraw'); return require('pairs.rainbow').status().pending"))
+    assert(lua("return vim.fn.mode()") == "i", "input left Insert mode")
+    assert(#bad_frames == 0, keys .. ": " .. table.concat(bad_frames, "\n"))
+  end
+  assert(frames > 0, "no intermediate UI frames were checked")
+  assert(#bad_frames == 0, table.concat(bad_frames, "\n"))
+  request("nvim_input", { "<Esc>" })
+  ready()
+  on_frame = nil
+  assert(#bad_frames == 0, table.concat(bad_frames, "\n"))
+  -- A context edit retains old colors while pending, then corrects them.
+  lua("vim.api.nvim_buf_set_text(0, 0, 0, 0, 0, {'--'})")
+  request("nvim_command", { "redraw" })
+  expect(1, 2, 0xe5c07b)
+  ready()
+  expect(1, 2, 0xe06c75)
+  lua("vim.cmd('only'); require('pairs').setup({rainbow = {debounce_ms = 0}})")
+  ready()
   -- One buffer in two windows, scrolling to cached offscreen lines.
   lua([[
     vim.api.nvim_buf_set_lines(0, -1, -1, false, vim.fn['repeat']({'([])'}, 100))
@@ -186,6 +256,6 @@ if not ok then
   vim.cmd("cquit 1")
 end
 io.stdout:write(
-  "PASS: rainbow UI colors, Markdown fences, edits, split windows, scroll, toggle and teardown\n"
+  "PASS: rainbow UI colors, Insert-mode frames, Markdown fences, edits, splits, scroll and teardown\n"
 )
 vim.cmd("qa!")

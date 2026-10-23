@@ -334,8 +334,11 @@ parsed exactly. Disable rainbow where those constructs require a parser-based
 highlighter.
 
 Scanning runs in background slices; rendering uses cached visible rows.
-Pending rows keep normal colors. Exceeding a limit clears rainbow only; later
-edits retry. Hidden buffers release their cache. |pairs.rainbow.toggle()|
+While a scan is pending, previously drawn brackets retain their colors and
+follow text edits; deleted brackets lose their colors immediately. New brackets
+and changes to nesting/string/comment context appear after the scan. Rows with
+no previous display keep normal colors. Exceeding a limit clears rainbow only;
+later edits retry. Hidden buffers release their cache. |pairs.rainbow.toggle()|
 refreshes the display; |pairs.rainbow.status()| reports `enabled`, `pending`,
 `reason`, `valid_lines`, `scanned_lines`, `brackets`, `slices`, `work_ms` and
 `max_slice_ms`. Counters accumulate since attachment; timings exclude UI/input

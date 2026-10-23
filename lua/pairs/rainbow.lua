@@ -1,5 +1,6 @@
 -- Parsing never runs in mappings or redraw callbacks. The provider only reads
--- the valid prefix of the cache and emits ephemeral marks for visible lines.
+-- the cache and emits ephemeral marks for visible lines. While scanning, a
+-- bounded snapshot of previously drawn brackets follows byte edits.
 local M = {}
 local api, uv = vim.api, vim.uv
 local scan = require("pairs.rainbow_scan")
@@ -103,6 +104,7 @@ end
 local function block(state, reason)
   state.reason, state.cache, state.next, state.brackets = reason, {}, 0, 0
   state.edits, state.tail, state.reset = {}, 0, false
+  state.windows = {}
   state.pending = false
 end
 
@@ -246,6 +248,46 @@ queue = function(buf, state, delay)
   end, delay)
 end
 
+-- Keep only brackets that survived the edit, with right gravity at insertions.
+-- Byte coordinates also handle UTF-8, line splits and joins without lexing in
+-- buffer callbacks. The work is bounded by the visible snapshot, not file size.
+local function move_display(buf, first, col, old_rows, old_col, new_rows, new_col)
+  local state = states[buf]
+  if not state then
+    return
+  end
+  local old_row, new_row = first + old_rows, first + new_rows
+  old_col = old_col + (old_rows == 0 and col or 0)
+  new_col = new_col + (new_rows == 0 and col or 0)
+  for win, display in pairs(state.windows) do
+    if not api.nvim_win_is_valid(win) or api.nvim_win_get_buf(win) ~= buf then
+      state.windows[win] = nil
+    else
+      local rows, count = {}, 0
+      for row, marks in vim.spairs(display.rows) do
+        for i = 1, #marks, 2 do
+          local target_row, target_col = row, marks[i]
+          if row > old_row or (row == old_row and target_col >= old_col) then
+            target_row = row + new_rows - old_rows
+            if row == old_row then
+              target_col = new_col + target_col - old_col
+            end
+          elseif row > first or (row == first and target_col >= col) then
+            target_row = nil -- The bracket itself was deleted/replaced.
+          end
+          if target_row then
+            local target = rows[target_row] or {}
+            rows[target_row] = target
+            target[#target + 1], target[#target + 2] = target_col, marks[i + 1]
+            count = count + 1
+          end
+        end
+      end
+      display.rows, display.count = rows, count
+    end
+  end
+end
+
 local function invalidate(buf, first, old_end, new_end)
   local state = states[buf]
   if not state then
@@ -290,6 +332,7 @@ local function attach(buf)
     state = {
       ft = ft,
       cache = {},
+      windows = {},
       edits = {},
       next = 0,
       tail = 0,
@@ -305,6 +348,9 @@ local function attach(buf)
   end
   if not attached[buf] then
     attached[buf] = api.nvim_buf_attach(buf, false, {
+      on_bytes = function(_, target, _, first, col, _, old_rows, old_col, _, new_rows, new_col)
+        move_display(target, first, col, old_rows, old_col, new_rows, new_col)
+      end,
       on_lines = function(_, target, _, first, old_end, new_end)
         invalidate(target, first, old_end, new_end)
       end,
@@ -365,6 +411,14 @@ function M.setup(candidate)
     end,
   })
   api.nvim_create_autocmd("ColorScheme", { group = group, callback = colors })
+  api.nvim_create_autocmd("WinClosed", {
+    group = group,
+    callback = function(args)
+      for _, state in pairs(states) do
+        state.windows[tonumber(args.match)] = nil
+      end
+    end,
+  })
   api.nvim_create_autocmd("BufHidden", {
     group = group,
     callback = function(args)
@@ -377,28 +431,52 @@ function M.setup(candidate)
   })
   local drawn = 0
   api.nvim_set_decoration_provider(ns, {
-    on_win = function(_, _, buf)
+    on_win = function(_, win, buf, top, bottom)
       drawn = 0
-      return states[buf] ~= nil and allowed(buf)
+      local state = states[buf]
+      if not state or not allowed(buf) then
+        return false
+      end
+      local display = state.windows[win] or { rows = {}, count = 0 }
+      state.windows[win] = display
+      for row, marks in pairs(display.rows) do
+        if row < top or row > bottom then
+          display.rows[row] = nil
+          display.count = display.count - #marks / 2
+        end
+      end
+      return true
     end,
     -- on_line is used for compatibility with Neovim 0.11.
-    on_line = function(_, _, buf, row)
+    on_line = function(_, win, buf, row)
       local state = states[buf]
-      if not state or row >= state.next then
+      if not state then
         return
       end
-      local entry = state.cache[row + 1]
-      if not entry then
+      local display = state.windows[win]
+      local entry = row < state.next and state.cache[row + 1] or nil
+      local marks = entry and entry.marks or display.rows[row]
+      if not marks then
         return
+      end
+      local snapshot
+      if entry then
+        display.count = display.count - #(display.rows[row] or {}) / 2
+        snapshot = {}
+        display.rows[row] = snapshot
       end
       local groups = options.highlights
-      for i = 1, #entry.marks, 2 do
+      for i = 1, #marks, 2 do
         if drawn >= options.max_visible_brackets then
           break
         end
         drawn = drawn + 1
         has_drawn = true
-        local col, depth = entry.marks[i], entry.marks[i + 1]
+        local col, depth = marks[i], marks[i + 1]
+        if snapshot and display.count < options.max_visible_brackets then
+          snapshot[#snapshot + 1], snapshot[#snapshot + 2] = col, depth
+          display.count = display.count + 1
+        end
         api.nvim_buf_set_extmark(buf, ns, row, col, {
           end_col = col + 1,
           hl_group = groups[(depth - 1) % #groups + 1],

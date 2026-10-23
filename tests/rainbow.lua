@@ -234,13 +234,14 @@ return function(h)
   end
   local function paint(row)
     local result = {}
-    provider.on_win(nil, 0, vim.api.nvim_get_current_buf())
+    local win = vim.api.nvim_get_current_win()
+    provider.on_win(nil, win, vim.api.nvim_get_current_buf(), 0, vim.api.nvim_buf_line_count(0))
     local original_mark = vim.api.nvim_buf_set_extmark
     vim.api.nvim_buf_set_extmark = function(_, _, line, col, opts)
       assert(opts.ephemeral and opts.end_col == col + 1)
       result[#result + 1] = { line, col, opts.hl_group }
     end
-    local ok, err = pcall(provider.on_line, nil, 0, vim.api.nvim_get_current_buf(), row)
+    local ok, err = pcall(provider.on_line, nil, win, vim.api.nvim_get_current_buf(), row)
     vim.api.nvim_buf_set_extmark = original_mark
     assert(ok, err)
     return result
@@ -270,6 +271,53 @@ return function(h)
     setup({ "()[]{}" }, "lua", { rainbow = { debounce_ms = 0, max_visible_brackets = 3 } })
     settle()
     eq(#paint(0), 3)
+  end)
+  test("rainbow: pending input preserves visible brackets and follows byte edits", function()
+    setup({ "{", "  ([])", "}" }, "lua", { rainbow = { debounce_ms = 100 } })
+    local before = settle()
+    local original = paint(1)
+    eq(#original, 4)
+    paint(2)
+    -- Insert at the same byte as a bracket, including multibyte text.
+    vim.api.nvim_buf_set_text(0, 1, 2, 1, 2, { "你好" })
+    local shifted = vim.deepcopy(original)
+    for _, mark in ipairs(shifted) do
+      mark[2] = mark[2] + 6
+    end
+    eq(paint(1), shifted)
+    eq(paint(2), { { 2, 0, "PairsRainbowRed" } })
+    eq(rainbow.status().scanned_lines, before.scanned_lines)
+    -- Splitting and joining lines moves the existing colors with the text.
+    vim.api.nvim_buf_set_text(0, 1, 9, 1, 9, { "", "" })
+    eq(paint(1), { { 1, 8, "PairsRainbowYellow" } })
+    eq(paint(2), {
+      { 2, 0, "PairsRainbowBlue" },
+      { 2, 1, "PairsRainbowBlue" },
+      { 2, 2, "PairsRainbowYellow" },
+    })
+    vim.api.nvim_buf_set_text(0, 1, 9, 2, 0, { "" })
+    eq(paint(1), shifted)
+    -- Deleted brackets must not color the character that replaces them.
+    vim.api.nvim_buf_set_text(0, 1, 11, 1, 12, { "x" })
+    table.remove(shifted, 4)
+    eq(paint(1), shifted)
+    settle()
+    eq(paint(1), shifted)
+    eq(paint(2), {}) -- The unmatched opener changes downstream nesting.
+  end)
+  test("rainbow: scrolling drops old display snapshots and limits clear them", function()
+    setup({ "()", "[]", "{}" }, "lua", { rainbow = { debounce_ms = 100, max_depth = 1 } })
+    settle()
+    paint(0)
+    paint(1)
+    local buf, win = vim.api.nvim_get_current_buf(), vim.api.nvim_get_current_win()
+    provider.on_win(nil, win, buf, 1, 3)
+    vim.api.nvim_buf_set_text(0, 0, 0, 0, 0, { " " })
+    eq(paint(0), {}) -- It left the window before this edit.
+    eq(#paint(1), 2)
+    vim.api.nvim_buf_set_text(0, 0, 0, 0, 0, { "(" })
+    settle("depth_limit")
+    eq(paint(1), {})
   end)
   test("rainbow: unfinished deeply nested comments use one forward scan", function()
     local text = string.rep("/*", 4000)
