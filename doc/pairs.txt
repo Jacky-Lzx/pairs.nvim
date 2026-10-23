@@ -354,9 +354,11 @@ MARKDOWN FENCES                                          *pairs-fences*
 Set filetypes.markdown.multi_pairs to { ['```'] = {}, ['~~~'] = {} }. Enter
 after a new fence of at least three backticks/tildes creates body and closing
 lines, preserving fence length, info, indentation and list/quote continuation.
-Both open/newline must be true. Closers skip at proven positions. Existing
-code, invalid positions and Backspace stay native; delete=true and space=true
-are unsupported. Inline backticks are not paired.
+Both open/newline must be true. An existing closer is reused; otherwise a new
+closer is inserted before following text, keeping that text outside the block.
+Closers skip at proven positions. Enter in the body, invalid positions and
+Backspace stay native; delete=true and space=true are unsupported. Inline
+backticks are not paired.
 
 LATEX MATH                                               *pairs-tex*
                                                          *pairs-tex-slash*

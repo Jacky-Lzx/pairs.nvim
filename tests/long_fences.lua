@@ -62,6 +62,42 @@ return function(h)
           header .. "\n" .. body .. "│\n" .. prefix .. delimiter
         )
         case(
+          "continuous before paragraph " .. label,
+          "│\n" .. prefix .. "已有正文",
+          header .. "<CR>body",
+          header
+            .. "\n"
+            .. body
+            .. "│\n"
+            .. prefix
+            .. delimiter
+            .. "\n"
+            .. prefix
+            .. "已有正文"
+        )
+        case(
+          "close before separated paragraph " .. label,
+          header .. "│\n" .. prefix .. "\n" .. prefix .. "已有正文",
+          "<CR>",
+          header
+            .. "\n"
+            .. prefix
+            .. "│\n"
+            .. prefix
+            .. delimiter
+            .. "\n"
+            .. prefix
+            .. "\n"
+            .. prefix
+            .. "已有正文"
+        )
+        case(
+          "reuse closer after content " .. label,
+          header .. "│\n" .. prefix .. "existing\n" .. prefix .. delimiter,
+          "<CR>",
+          header .. "\n" .. prefix .. "│\n" .. prefix .. "existing\n" .. prefix .. delimiter
+        )
+        case(
           "skip " .. label,
           header .. "\n" .. body .. "\n" .. prefix .. "│" .. delimiter,
           delimiter,
@@ -98,10 +134,10 @@ return function(h)
       delimiter .. "\n" .. other .. "│" .. other .. "\n" .. delimiter
     )
     case(
-      "do not duplicate existing body " .. char,
+      "close before existing body " .. char,
       delimiter .. "│\nbody",
       "<CR>",
-      delimiter .. "\n│\nbody"
+      delimiter .. "\n│\n" .. delimiter .. "\nbody"
     )
     case(
       "family disabled " .. char,
@@ -184,6 +220,23 @@ return function(h)
       nil,
       { comments = "b:>,b:-", formatoptions = "rno", indentexpr = "8", expandtab = false }
     )
+    test("long fence: undo redo dot preserves following paragraph " .. char, function()
+      local original = { "> " .. delimiter .. "lua", "> 已有正文" }
+      input(
+        original[1] .. "│\n" .. original[2],
+        "<CR>body",
+        original[1] .. "\n> body│\n> " .. delimiter .. "\n" .. original[2],
+        opts,
+        "markdown"
+      )
+      local expanded = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+      feed("u")
+      eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), original)
+      feed("<C-r>")
+      eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), expanded)
+      feed("u$.")
+      eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), expanded)
+    end)
     test("long fence: native undo redo dot " .. char, function()
       input(
         "│",

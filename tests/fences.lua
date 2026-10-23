@@ -167,7 +167,12 @@ return function(h)
     "<CR>body",
     "- ```lua\n  body│\n  ```\n  after"
   )
-  case("preserve quote content", "> ```lua│\n> body", "<CR>", "> ```lua\n> │\n> body")
+  case(
+    "close quote fence before following content",
+    "> ```lua│\n> body",
+    "<CR>",
+    "> ```lua\n> │\n> ```\n> body"
+  )
   case(
     "reuse mixed closer",
     "> - ```lua│\n>   ```",
@@ -222,7 +227,7 @@ return function(h)
   case("reuse later closer", "```lua│\nbody\n```", "<CR>", "```lua\n│\nbody\n```")
   case("reuse longer closer", "```│\n`````", "<CR>", "```\n│\n`````")
   case("reuse indented closer", "  ```│\n   ```  ", "<CR>", "  ```\n  │\n   ```  ")
-  case("existing unclosed content is preserved", "```│\nbody", "<CR>", "```\n│\nbody")
+  case("close fence before following content", "```│\nbody", "<CR>", "```\n│\n```\nbody")
   case("Enter in body stays native", "```lua\nbody│\n```", "<CR>", "```lua\nbody\n│\n```")
   case("Enter on closing line stays native", "```\nbody\n```│", "<CR>", "```\nbody\n```\n│")
   case("short fence inside longer block", "````\n```│\n````", "<CR>", "````\n```\n│\n````")

@@ -160,14 +160,11 @@ local function markdown_fence(buf, parser, range)
         supported = prefix ~= nil and #delimiter >= 3,
         delimiter = delimiter,
         prefix = containers and prefix or nil,
-        has_content = false,
       }
       -- The block has at most a few direct children. Content descendants are
       -- not traversed, so large code blocks do not add scanning work.
       for child in node:iter_children() do
-        if child:type() == "code_fence_content" then
-          result.has_content = true
-        elseif child:type() == "fenced_code_block_delimiter" and child:range() > row then
+        if child:type() == "fenced_code_block_delimiter" and child:range() > row then
           last = child
         end
       end

@@ -31,13 +31,8 @@ function M.decide(ctx, key)
         prefix = fence.prefix,
       }
     end
-    if fence.has_content then
-      return {
-        action = fence.prefix and "continue" or "pass",
-        reason = "fence_existing_content",
-        prefix = fence.prefix,
-      }
-    end
+    -- An unclosed fence absorbs following prose into its syntax node. Close
+    -- immediately below the new body line so that prose stays outside it.
     return {
       action = "newline",
       reason = "fence_opening",
