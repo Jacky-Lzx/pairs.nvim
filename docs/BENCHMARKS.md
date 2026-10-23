@@ -82,7 +82,15 @@ PAIRS_TEST_PARSER_ROOT=/tmp/pairs-parsers \
 
 Set `NVIM_BIN` to another executable to check a supported version, including for
 `./tests/run.sh`. `NVIM` is reserved for the parent Neovim's RPC address when
-running inside its terminals/jobs. Defaults are
+running inside its terminals/jobs.
+
+`./tests/run.sh` prints one summary line per suite; `./tests/bench.sh` prints
+aligned timing tables. Both hide editing prompts on success and show full
+diagnostics on failure. Results use green `PASS` / red `FAIL` labels in a
+terminal; redirected output stays plain. Set `FORCE_COLOR=1` to force colors or
+`NO_COLOR=1` to disable them (including when `FORCE_COLOR` is set).
+
+Benchmark defaults are
 1000 decision samples (minimum 100), 50000 file lines (minimum 1000), and 20
 mapped batch samples (minimum 5). JSON schema 1 records Neovim/CPU/OS versions,
 parameters, Git revision/dirty state, runtime source and benchmark SHA-256,

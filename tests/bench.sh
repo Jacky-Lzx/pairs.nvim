@@ -8,5 +8,5 @@ export XDG_CONFIG_HOME="$bench_tmp/config"
 export XDG_STATE_HOME="$bench_tmp/state"
 export XDG_DATA_HOME="$bench_tmp/data"
 export NVIM_LOG_FILE="$bench_tmp/nvim.log"
-# NVIM is the parent Neovim's RPC address in terminals/jobs, not an executable.
-"${NVIM_BIN:-nvim}" --headless -u tests/minimal_init.lua -i NONE -l tests/bench.lua
+. ./tests/runner.sh
+run_suite tests/bench.lua "$bench_tmp"

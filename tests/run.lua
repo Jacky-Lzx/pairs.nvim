@@ -1245,6 +1245,8 @@ if #failures > 0 then
   io.stderr:write(string.format("%d/%d tests failed\n", #failures, count))
   vim.cmd("cquit 1")
 else
-  print(string.format("PASS: %d tests (real Neovim input, cursor, undo, mappings)", count))
+  io.stdout:write(
+    string.format("PASS: %d tests (real Neovim input, cursor, undo, mappings)\n", count)
+  )
   vim.cmd("qa!")
 end

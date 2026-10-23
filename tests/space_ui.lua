@@ -141,5 +141,5 @@ if not ok then
   io.stderr:write(err .. "\n" .. table.concat(errors))
   vim.cmd("cquit 1")
 end
-print("PASS: Space renders immediately, including padding and longer mapping prefixes")
+io.stdout:write("PASS: Space renders immediately, including padding and longer mapping prefixes\n")
 vim.cmd("qa!")

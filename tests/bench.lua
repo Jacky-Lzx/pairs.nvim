@@ -638,13 +638,25 @@ if vim.env.PAIRS_TEST_PARSER_ROOT then
   mapped("mapped-tex-inline", "\\(x\\)", { "\\(x\\)" }, false, 4, tex_opts, "tex")
   mapped("mapped-tex-display", "\\[<CR>x", { "\\[", "x", "\\]" }, false, 3, tex_opts, "tex")
 end
-print(
-  "pairs.nvim benchmark: " .. tostring(vim.version()) .. ", " .. large_lines .. " large-file lines"
+local function write_line(text)
+  io.stdout:write((text or "") .. "\n")
+end
+write_line("pairs.nvim benchmark: Neovim " .. tostring(vim.version()))
+write_line(
+  string.format(
+    "Samples: %d decisions, %d mapped batches | Large-file lines: %d",
+    samples,
+    mapped_samples,
+    large_lines
+  )
 )
-print("Decision latency (microseconds; normal GC, prepared buffer, assume_insert API):")
-print(string.format("%-32s %9s %9s %9s %12s", "scenario", "median", "p95", "max", "Lua B/call"))
+write_line()
+write_line("Decision latency (microseconds; normal GC, prepared buffer, assume_insert API):")
+write_line(
+  string.format("%-32s %9s %9s %9s %12s", "scenario", "median", "p95", "max", "Lua B/call")
+)
 for _, row in ipairs(report.decisions) do
-  print(
+  write_line(
     string.format(
       "%-32s %9.2f %9.2f %9.2f %12s",
       row.name,
@@ -656,9 +668,13 @@ for _, row in ipairs(report.decisions) do
     )
   )
 end
-print("Mapped batch latency (microseconds; feedkeys, edits, no UI rendering):")
+write_line()
+write_line("Mapped batch latency (microseconds; feedkeys, edits, no UI rendering):")
+write_line(string.format("%-32s %9s %9s %9s", "scenario", "median", "p95", "max"))
 for _, row in ipairs(report.mapped) do
-  print(string.format("%-32s %9.2f %9.2f %9.2f", row.name, row.median_us, row.p95_us, row.max_us))
+  write_line(
+    string.format("%-32s %9.2f %9.2f %9.2f", row.name, row.median_us, row.p95_us, row.max_us)
+  )
 end
 if vim.env.PAIRS_BENCH_OUTPUT then
   assert(
@@ -666,5 +682,6 @@ if vim.env.PAIRS_BENCH_OUTPUT then
     "cannot write benchmark JSON"
   )
 end
-print("PASS: benchmark actions, mapped text, undo/redo/dot")
+write_line()
+write_line("PASS: benchmark actions, mapped text, undo/redo/dot")
 vim.cmd("qa!")

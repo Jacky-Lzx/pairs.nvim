@@ -147,5 +147,5 @@ if not ok then
   io.stderr:write(err .. "\n" .. table.concat(errors))
   vim.cmd("cquit 1")
 end
-print("PASS: rainbow UI colors, edits, split windows, scroll, toggle and teardown")
+io.stdout:write("PASS: rainbow UI colors, edits, split windows, scroll, toggle and teardown\n")
 vim.cmd("qa!")
