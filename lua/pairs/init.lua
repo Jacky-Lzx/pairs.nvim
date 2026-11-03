@@ -1,6 +1,7 @@
 local M = {}
 local config
 local enabled = true
+local pending_close
 local trace = require("pairs.trace")
 
 function M.setup(opts)
@@ -10,6 +11,7 @@ function M.setup(opts)
   mapping.detach()
   require("pairs.surround").teardown()
   config, enabled = candidate, true
+  pending_close = nil
   mapping.attach(config, M.handle, M.fast_wrap)
   require("pairs.rainbow").setup(config)
   require("pairs.surround").setup(config, function()
@@ -26,7 +28,25 @@ local function decide(key, opts)
   if not ok then
     return { action = "pass", reason = "context_error", error = tostring(ctx) }
   end
-  local result = require("pairs.engine").decide(ctx, key)
+  local pending = opts and opts.pending_close
+  local result
+  if
+    pending
+    and ctx.enabled
+    and ctx.buf == pending.buf
+    and ctx.filetype == pending.filetype
+    and ctx.row == pending.row
+    and ctx.col == pending.col
+    and ctx.line == pending.line
+    and vim.api.nvim_buf_get_changedtick(ctx.buf) == pending.tick + 1
+    and key == pending.close:sub(-1)
+  then
+    -- The sole change since a proven math boundary is the literal prefix.
+    -- Remove that prefix and move over the original two-byte closer.
+    result = { action = "skip", reason = "math_closer", close = pending.close, delete_before = 1 }
+  else
+    result = require("pairs.engine").decide(ctx, key)
+  end
   result.filetype, result.syntax = ctx.filetype, ctx.syntax
   return result, ctx
 end
@@ -37,7 +57,20 @@ end
 
 -- Composable expression API: nil means this plugin did not handle the key.
 function M.expr(key)
-  local result, ctx = decide(key)
+  local pending = pending_close
+  pending_close = nil
+  local result, ctx = decide(key, { pending_close = pending })
+  if ctx and result.defer_close then
+    pending_close = {
+      buf = ctx.buf,
+      filetype = ctx.filetype,
+      row = ctx.row,
+      col = ctx.col + 1,
+      line = ctx.line:sub(1, ctx.col) .. "\\" .. ctx.line:sub(ctx.col + 1),
+      tick = vim.api.nvim_buf_get_changedtick(ctx.buf),
+      close = result.defer_close,
+    }
+  end
   if trace.active then
     local ok, err = pcall(trace.record, key, result, ctx, config)
     if not ok then
@@ -82,6 +115,7 @@ function M.toggle(buf)
 end
 
 function M.teardown()
+  pending_close = nil
   trace.stop()
   require("pairs.rainbow").teardown()
   require("pairs.surround").teardown()

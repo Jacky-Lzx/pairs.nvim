@@ -90,7 +90,22 @@ return function(h)
       open .. "x^2" .. close,
       open .. "x^2" .. close .. "│"
     )
-    case(open .. " skip backslash", open .. "x│" .. close, "\\", open .. "x\\│" .. ending)
+    case(open .. " pending backslash", open .. "x│" .. close, "\\", open .. "x\\│" .. close)
+    for _, command in ipairs({ "\\alpha", "\\frac", "\\textbf" }) do
+      case(
+        open .. " command before closer " .. command,
+        open .. "│" .. close,
+        command,
+        open .. command .. "│" .. close
+      )
+      case(
+        open .. " command after body " .. command,
+        open .. "x│" .. close,
+        command,
+        open .. "x" .. command .. "│" .. close
+      )
+    end
+    case(open .. " delete pending prefix", open .. "│" .. close, "\\<BS>", open .. "│" .. close)
     case(
       open .. " skip final character",
       open .. "x\\│" .. ending,
@@ -298,6 +313,13 @@ return function(h)
       eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), lines)
     end
   end)
+  test("tex slash: commands before a closer undo and redo without touching it", function()
+    input("\\(│\\)", "\\alpha", "\\(\\alpha│\\)", opts, "tex")
+    feed("u")
+    eq(vim.api.nvim_get_current_line(), "\\(\\)")
+    feed("<C-r>")
+    eq(vim.api.nvim_get_current_line(), "\\(\\alpha\\)")
+  end)
   test("tex slash: missing parser does not edit delimiters", function()
     local original = vim.treesitter.get_parser
     vim.treesitter.get_parser = function()
@@ -334,7 +356,7 @@ return function(h)
     plugin.setup(opts)
     local parser = vim.treesitter.get_parser(0, "latex")
     parser:parse(true)
-    eq(plugin.explain("\\", { assume_insert = true }).action, "skip")
+    eq(plugin.explain("\\", { assume_insert = true }).defer_close, "\\)")
     vim.api.nvim_buf_set_lines(0, 0, -1, false, { "\\(x\\)" })
     local original = parser.parse
     parser.parse = function()

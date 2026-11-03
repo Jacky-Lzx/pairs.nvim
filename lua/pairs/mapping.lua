@@ -52,7 +52,7 @@ function M.attach(config, handler, fast_wrap)
           keys[" "] = true
         end
         if open == "\\(" or open == "\\[" then
-          keys["\\"] = true -- Skip the first character of a proven TeX closer.
+          keys["\\"] = true -- Record a possible TeX closer without consuming a command prefix.
         end
       end
     end
@@ -143,7 +143,8 @@ function M.render(result, ctx)
       .. result.close
       .. string.rep(keycode("<C-g>U<Left>"), #result.close)
   elseif result.action == "skip" then
-    return string.rep(keycode("<C-g>U<Right>"), result.move or #result.close)
+    return string.rep(keycode("<BS>"), result.delete_before or 0)
+      .. string.rep(keycode("<C-g>U<Right>"), result.move or #result.close)
   elseif result.action == "delete" then
     return string.rep(keycode("<BS>"), #result.open) .. string.rep(keycode("<Del>"), #result.close)
   elseif result.action == "continue" then

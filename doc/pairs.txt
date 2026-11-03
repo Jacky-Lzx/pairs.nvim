@@ -410,7 +410,8 @@ For `tex`/`plaintex` with the `latex` parser, use these `multi_pairs`: >lua
   │  + \( -> \(│\)
   │  + \[ -> \[│\]
 
-Closers skip one character at a time, including backslashes. <BS> deletes
+The first backslash remains literal so commands can be typed before a closer.
+Typing the matching final byte then skips the existing closer. <BS> deletes
 empty pairs. Enter expands $$ and \[; \( defaults to `newline=false`.
 Single-dollar math is not paired. Comments, existing math and literal/unknown
 contexts stay protected.

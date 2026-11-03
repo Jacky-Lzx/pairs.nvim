@@ -21,6 +21,11 @@ local function pair_action(ctx, key, rule, pair)
   if
     closing and key == pair.close:sub(ctx.col - pair.close_col + 1, ctx.col - pair.close_col + 1)
   then
+    if key == "\\" and rule.skip then
+      -- A backslash may start a command. Only a subsequent matching final
+      -- byte can confirm that the user intended to skip the existing closer.
+      return { action = "pass", reason = "math_closer_prefix", defer_close = pair.close }
+    end
     return {
       action = rule.skip and "skip" or "pass",
       reason = kind .. "_closer",
