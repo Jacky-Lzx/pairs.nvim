@@ -60,9 +60,9 @@ function M.attach(config, handler, fast_wrap)
   register_multi(config.multi_pairs)
   local prepared = require("pairs.config")
   for ft in pairs(config.filetypes) do
-    local resolved = prepared.capture(config, ft)
-    register(resolved.rules)
-    register_multi(resolved.multi_rules)
+    local rules, multi = prepared.mapping_rules(config, ft)
+    register(rules)
+    register_multi(multi)
   end
   if config.mappings.bs then
     keys["<BS>"] = true

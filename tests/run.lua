@@ -936,6 +936,50 @@ test("invalid setup preserves current configuration", function()
   eq(plugin.status().mappings, before)
 end)
 
+test("unused filetypes are validated before changing active mappings", function()
+  seed("│", "lua")
+  plugin.setup()
+  local before = plugin.status().mappings
+  for _, overrides in ipairs({
+    { pairs = { ["("] = { close = "invalid" } } },
+    { multi_pairs = { ["<<"] = { close = "\n" } } },
+    { tex_environments = { custom = "invalid" } },
+  }) do
+    eq(pcall(plugin.setup, { filetypes = { unused = overrides } }), false)
+    eq(plugin.status().mappings, before)
+  end
+end)
+
+test("filetype matching metadata compiles once at first capture", function()
+  local config, generic = require("pairs.config"), require("pairs.generic")
+  local original, calls = generic.prepare, 0
+  generic.prepare = function(...)
+    calls = calls + 1
+    return original(...)
+  end
+  local ok, err = pcall(function()
+    local candidate = config.build({ filetypes = { alpha = { pairs = { ["("] = false } } } })
+    eq(calls, 0)
+    local rules = config.mapping_rules(candidate, "alpha")
+    eq(rules["("], false)
+    eq(calls, 0)
+    local first = config.capture(candidate, "alpha")
+    eq(calls, 1)
+    assert(config.capture(candidate, "alpha") == first)
+    eq(calls, 1)
+    local external = config.resolve(candidate, "alpha")
+    external["["] = false
+    assert(config.capture(candidate, "alpha").rules["["] ~= false)
+    config.capture(candidate, "alpha", { ["["] = false })
+    config.capture(candidate, "alpha", { ["["] = false })
+    eq(calls, 3) -- Live buffer overrides are deliberately not cached.
+    config.capture(candidate, "other")
+    eq(calls, 4)
+  end)
+  generic.prepare = original
+  assert(ok, err)
+end)
+
 test("expr composes with fallback", function()
   local entry = seed("│")
   plugin.setup({ mappings = { enabled = false } })

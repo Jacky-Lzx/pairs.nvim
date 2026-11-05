@@ -311,8 +311,14 @@ function M.build(opts)
   validate_multi(config.multi_pairs)
   require("pairs.tex_env").validate(config.tex_environments)
   assert(type(config.filetypes) == "table", "pairs: filetypes must be a table")
-  local metadata = { default = prepare(config.pairs, config.multi_pairs), filetypes = {} }
-  metadata.default.tex = prepare_tex(config.tex_environments)
+  local metadata = {
+    default = {
+      rules = config.pairs,
+      multi_rules = config.multi_pairs,
+      environments = config.tex_environments,
+    },
+    filetypes = {},
+  }
   for ft, overrides in pairs(config.filetypes) do
     assert(type(ft) == "string" and type(overrides) == "table", "pairs: invalid filetype override")
     if overrides.surround ~= nil then
@@ -320,35 +326,56 @@ function M.build(opts)
         vim.tbl_deep_extend("force", vim.deepcopy(config.surround), overrides.surround)
       )
     end
-    if overrides.tex_environments ~= nil then
-      require("pairs.tex_env").validate(overrides.tex_environments)
+    -- Unchanged setup-owned layers are already normalized and validated. Share
+    -- them internally; public resolve helpers still return independent tables.
+    local rules, multi, environments = config.pairs, config.multi_pairs, config.tex_environments
+    if overrides.pairs ~= nil then
+      rules = merge_rules(config.pairs, overrides.pairs)
+      validate_pairs(rules)
     end
-    local rules = merge_rules(config.pairs, overrides.pairs)
-    validate_pairs(rules)
-    local multi =
-      vim.tbl_deep_extend("force", vim.deepcopy(config.multi_pairs), overrides.multi_pairs or {})
-    validate_multi(multi)
-    local environments = vim.tbl_deep_extend(
-      "force",
-      vim.deepcopy(config.tex_environments),
-      overrides.tex_environments or {}
-    )
-    require("pairs.tex_env").validate(environments)
+    if overrides.multi_pairs ~= nil then
+      multi =
+        vim.tbl_deep_extend("force", vim.deepcopy(config.multi_pairs), overrides.multi_pairs or {})
+      validate_multi(multi)
+    end
+    if overrides.tex_environments ~= nil then
+      environments = vim.tbl_deep_extend(
+        "force",
+        vim.deepcopy(config.tex_environments),
+        overrides.tex_environments
+      )
+      require("pairs.tex_env").validate(environments)
+    end
     if overrides.enabled ~= nil then
       assert(type(overrides.enabled) == "boolean", "pairs: filetype enabled must be boolean")
     end
-    metadata.filetypes[ft] = prepare(rules, multi)
-    metadata.filetypes[ft].tex = prepare_tex(environments)
+    metadata.filetypes[ft] = { rules = rules, multi_rules = multi, environments = environments }
   end
   prepared[config] = metadata
   return config
 end
 
+local function layer(config, ft)
+  local metadata = assert(prepared[config], "pairs: configuration was not built")
+  return metadata.filetypes[ft] or metadata.default
+end
+
+-- Mapping installation needs the complete key union, not matching metadata.
+function M.mapping_rules(config, ft)
+  local selected = layer(config, ft)
+  return selected.rules, selected.multi_rules
+end
+
 -- Internal capture path returns read-only setup metadata. Public resolve helpers
 -- below retain independent tables; live buffer rules still merge and validate.
 function M.capture(config, ft, buffer)
-  local metadata = assert(prepared[config], "pairs: configuration was not built")
-  local base = metadata.filetypes[ft] or metadata.default
+  local selected = layer(config, ft)
+  if not selected.compiled then
+    selected.compiled = prepare(selected.rules, selected.multi_rules)
+    selected.tex = selected.tex or prepare_tex(selected.environments)
+    selected.compiled.tex = selected.tex
+  end
+  local base = selected.compiled
   if not buffer then
     return base
   end
@@ -392,8 +419,9 @@ function M.capture_tex(config, ft, buffer)
   if buffer ~= nil then
     return prepare_tex(M.resolve_tex(config, ft, buffer))
   end
-  local metadata = assert(prepared[config], "pairs: configuration was not built")
-  return (metadata.filetypes[ft] or metadata.default).tex
+  local selected = layer(config, ft)
+  selected.tex = selected.tex or prepare_tex(selected.environments)
+  return selected.tex
 end
 
 return M

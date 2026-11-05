@@ -44,6 +44,12 @@ supported. Tab is never mapped; paste, macros and Replace mode bypass pairing.
 
 ## Configure
 
+Setup validates every filetype override before replacing active mappings.
+Unchanged rule layers share setup-owned data; matching metadata is compiled once
+when that filetype is first used. All required keys are mapped during setup,
+including keys used only by another filetype. Public resolve helpers still return
+independent tables, and live buffer overrides remain uncached.
+
 Only overrides are needed. Set these in lazy.nvim's `opts`, or pass them to
 `setup()`:
 
