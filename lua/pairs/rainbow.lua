@@ -492,6 +492,47 @@ function M.setup(candidate)
   end
 end
 
+---Return bounded decorations for an immutable full document, without attaching
+---buffers, scheduling work or changing the live rainbow cache. Rows/columns are
+---zero-based bytes, suitable for projection into read-only previews.
+function M.snapshot(lines, ft)
+  if
+    not options
+    or not options.enabled
+    or vim.tbl_contains(config.disabled_filetypes, ft)
+    or (config.filetypes[ft] or {}).enabled == false
+    or #lines > options.max_lines
+  then
+    return nil
+  end
+  local state, spans, bytes = scan.initial(), {}, 0
+  for row, text in ipairs(lines) do
+    bytes = bytes + #text + 1
+    if bytes > options.max_bytes or #text > options.max_line_bytes then
+      return nil
+    end
+    local entry = scan.line(text, state, ft, options)
+    if not entry then
+      return nil
+    end
+    state = entry.after
+    for i = 1, #entry.marks, 2 do
+      if #spans >= options.max_brackets then
+        return nil
+      end
+      local col, depth = entry.marks[i], entry.marks[i + 1]
+      spans[#spans + 1] = {
+        row = row - 1,
+        col = col,
+        end_col = col + 1,
+        hl_group = options.highlights[(depth - 1) % #options.highlights + 1],
+        priority = options.priority,
+      }
+    end
+  end
+  return spans
+end
+
 function M.toggle(buf)
   buf = buf and buf ~= 0 and buf or api.nvim_get_current_buf()
   vim.b[buf].pairs_rainbow = vim.b[buf].pairs_rainbow == false

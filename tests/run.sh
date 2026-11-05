@@ -11,5 +11,6 @@ export NVIM_LOG_FILE="$task_tmp/nvim.log"
 . ./tests/runner.sh
 
 run_suite tests/run.lua "$task_tmp"
+run_suite tests/rainbow_snapshot.lua "$task_tmp"
 run_suite tests/rainbow_ui.lua "$task_tmp"
 run_suite tests/space_ui.lua "$task_tmp"

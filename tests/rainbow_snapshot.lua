@@ -1,0 +1,21 @@
+vim.opt.rtp:prepend(vim.fn.getcwd())
+local pairs = require("pairs")
+pairs.setup({ rainbow = { highlights = { "One", "Two", "Three" } } })
+local rainbow = require("pairs.rainbow")
+local buffers = vim.api.nvim_list_bufs()
+local lines = { "local a = {", "  --[[ (ignored)", "  still ignored ]] ", "  { '()', 1 },", "}" }
+local spans = assert(rainbow.snapshot(lines, "lua"))
+assert(#spans == 4 and spans[1].hl_group == "One" and spans[2].hl_group == "Two")
+assert(spans[3].hl_group == "Two" and spans[4].hl_group == "One")
+assert(spans[1].row == 0 and spans[4].row == 4 and spans[4].col == 0)
+assert(vim.deep_equal(buffers, vim.api.nvim_list_bufs()))
+pairs.setup({ rainbow = { enabled = false } })
+assert(rainbow.snapshot(lines, "lua") == nil)
+pairs.setup({ rainbow = { max_depth = 1 } })
+assert(rainbow.snapshot(lines, "lua") == nil, "Limit failures never publish incomplete decorations")
+pairs.setup({ filetypes = { lua = { enabled = false } } })
+assert(rainbow.snapshot(lines, "lua") == nil)
+print(
+  "PASS: rainbow full document snapshots: nesting, lexical context, disabled state, limits and no buffers"
+)
+vim.cmd("qa!")

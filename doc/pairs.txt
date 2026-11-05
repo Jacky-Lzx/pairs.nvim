@@ -333,6 +333,13 @@ containers, regex, JSX, other injections, TeX verbatim and heredocs are not
 parsed exactly. Disable rainbow where those constructs require a parser-based
 highlighter.
 
+pairs.rainbow.snapshot(lines, ft)                      *pairs.rainbow.snapshot()*
+    Return decorations for an immutable complete document using the configured
+    scanner, palette and limits. No buffers, timers or live caches are created.
+    Each span has zero-based byte row,col,end_col,hl_group and priority. Disabled
+    or over-limit documents return nil. Read-only hosts can project these spans
+    into their own previews, as git-tools does for full-document diffs.
+
 Scanning runs in background slices; rendering uses cached visible rows.
 While a scan is pending, previously drawn brackets retain their colors and
 follow text edits; deleted brackets lose their colors immediately. New brackets

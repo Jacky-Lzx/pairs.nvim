@@ -106,6 +106,13 @@ Enabled by default for `()`, `[]` and `{}`, independently of Tree-sitter.
 Set `rainbow = { enabled = false }` to disable, or use `:PairsRainbowToggle`
 for the current buffer. Palette, limits and lexical scope: `:help pairs-rainbow`.
 
+`require("pairs.rainbow").snapshot(lines, ft)` returns rainbow decorations for
+an immutable full document using the configured palette and lexical scanner.
+It creates no buffers, timers or live cache entries. Each span contains
+zero-based byte `row`, `col`, `end_col`, `hl_group` and `priority`; disabled or
+over-limit documents return `nil`. Read-only hosts can project these spans into
+previews, as git-tools does for full-document diffs.
+
 ### Language and custom pairs
 
 Language rules are opt-in under `multi_pairs` and require `treesitter = true`
