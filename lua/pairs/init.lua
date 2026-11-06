@@ -5,6 +5,8 @@ local pending_close
 local trace = require("pairs.trace")
 
 function M.setup(opts)
+  assert(opts == nil or type(opts) == "table", "pairs.nvim: setup expects a table")
+  opts = vim.deepcopy(opts or {})
   -- Validate first so an invalid setup does not destroy a working configuration.
   local candidate = require("pairs.config").build(opts)
   local mapping = require("pairs.mapping")
@@ -121,6 +123,11 @@ function M.teardown()
   require("pairs.surround").teardown()
   require("pairs.mapping").detach()
   config = nil
+end
+
+function M.dispose()
+  M.teardown()
+  enabled = true
 end
 
 function M.status()

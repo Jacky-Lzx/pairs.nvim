@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
+nvim --headless -u NONE -i NONE --noplugin -l tests/setup_contract.lua
 nvim --headless -u NONE -i NONE --noplugin -l tests/command_ownership.lua
 task_tmp=$(mktemp -d)
 trap 'rm -rf "$task_tmp"' EXIT HUP INT TERM
