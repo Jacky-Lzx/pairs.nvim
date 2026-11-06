@@ -28,7 +28,7 @@ return function(h)
       delete = false,
       space = false,
     })
-    eq(vim.fn.maparg("`", "i", false, true).desc, "pairs.nvim `")
+    eq(vim.fn.maparg("`", "i", false, true).desc, "pairs.nvim: Insert or skip paired delimiter `")
   end)
   test("fence: invalid closer is rejected", function()
     eq(pcall(plugin.setup, options({ close = "~~~" })), false)

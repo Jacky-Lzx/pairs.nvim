@@ -87,11 +87,16 @@ function M.attach(config, handler, fast_wrap)
         end
         return handler(key)
       end
+      local desc = key == config.mappings.fast_wrap and "Wrap text with a pair"
+        or key == "<BS>" and "Delete pair or previous character"
+        or key == "<CR>" and "Insert newline inside pair"
+        or key == " " and "Insert paired spacing"
+        or ("Insert or skip paired delimiter " .. lhs)
       vim.keymap.set("i", plug, callback, {
         expr = true,
         replace_keycodes = false,
         silent = true,
-        desc = "pairs.nvim deferred " .. lhs,
+        desc = "pairs.nvim: " .. desc,
       })
       -- Expr mappings may be evaluated before preceding typed text is applied.
       -- Ignore flushes that text before the private expression is evaluated.
@@ -100,7 +105,7 @@ function M.attach(config, handler, fast_wrap)
       vim.keymap.set("i", lhs, rhs, {
         silent = true,
         nowait = key == " ",
-        desc = "pairs.nvim " .. lhs,
+        desc = "pairs.nvim: " .. desc,
       })
       mappings[lhs_code] = { rhs = rhs }
       mappings[plug_code] = { callback = callback }

@@ -62,7 +62,7 @@ return function(h)
     test("tex environments: reject " .. vim.inspect(invalid), function()
       plugin.setup(opts)
       eq(pcall(plugin.setup, invalid), false)
-      eq(vim.fn.maparg("$", "i", false, true).desc, "pairs.nvim $")
+      eq(vim.fn.maparg("$", "i", false, true).desc, "pairs.nvim: Insert or skip paired delimiter $")
     end)
   end
   test("tex environments: declarations do not enable math rules", function()

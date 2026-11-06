@@ -93,7 +93,7 @@ return function(h)
   test("space: declared filetype rules install one global Space mapping", function()
     local ft = { filetypes = { python = { pairs = { ["("] = { space = true } } } } }
     input("(│)", " ", "( │ )", ft, "python")
-    eq(vim.fn.maparg("<Space>", "i", false, true).desc, "pairs.nvim <Space>")
+    eq(vim.fn.maparg("<Space>", "i", false, true).desc, "pairs.nvim: Insert paired spacing")
     input("(│)", " ", "( │)", ft, "lua")
   end)
   test("space: buffer disable, replacement and removal remain live", function()

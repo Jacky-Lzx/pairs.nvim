@@ -29,7 +29,10 @@ return function(h)
         delete = false,
         space = false,
       })
-      eq(vim.fn.maparg(family:sub(1, 1), "i", false, true).desc, "pairs.nvim " .. family:sub(1, 1))
+      eq(
+        vim.fn.maparg(family:sub(1, 1), "i", false, true).desc,
+        "pairs.nvim: Insert or skip paired delimiter " .. family:sub(1, 1)
+      )
     end
   end)
   test("long fence: longer configuration keys are rejected", function()

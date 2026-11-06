@@ -18,7 +18,7 @@ return function(h)
     local original = vim.deepcopy(opts)
     plugin.setup(opts)
     eq(opts, original)
-    eq(vim.fn.maparg("<Space>", "i", false, true).desc, "pairs.nvim <Space>")
+    eq(vim.fn.maparg("<Space>", "i", false, true).desc, "pairs.nvim: Insert paired spacing")
     plugin.setup({ multi_pairs = { [triple] = {} } })
     eq(vim.fn.maparg("<Space>", "i"), "")
   end)
@@ -32,7 +32,7 @@ return function(h)
       { multi_pairs = { ["~~~"] = { space = true } } },
     }) do
       eq(pcall(plugin.setup, invalid), false)
-      eq(vim.fn.maparg("<Space>", "i", false, true).desc, "pairs.nvim <Space>")
+      eq(vim.fn.maparg("<Space>", "i", false, true).desc, "pairs.nvim: Insert paired spacing")
     end
     vim.b.pairs_multi_rules = { [triple] = { space = "yes" } }
     eq(plugin.explain("<Space>", { assume_insert = true }).reason, "context_error")
@@ -44,7 +44,7 @@ return function(h)
     plugin.setup({
       filetypes = { python = { multi_pairs = { [triple] = { space = true } } } },
     })
-    eq(vim.fn.maparg("<Space>", "i", false, true).desc, "pairs.nvim <Space>")
+    eq(vim.fn.maparg("<Space>", "i", false, true).desc, "pairs.nvim: Insert paired spacing")
     input("(│)", " ", "( │)", options(triple))
   end)
   test("multi space: existing global and buffer Space owners are preserved", function()

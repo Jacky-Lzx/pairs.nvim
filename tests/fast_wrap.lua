@@ -228,7 +228,7 @@ return function(h)
       { pairs = { ["<"] = { close = ">", wrap = true } } },
     }) do
       eq(pcall(plugin.setup, invalid), false)
-      eq(vim.fn.maparg("<F8>", "i", false, true).desc, "pairs.nvim <F8>")
+      eq(vim.fn.maparg("<F8>", "i", false, true).desc, "pairs.nvim: Wrap text with a pair")
       eq(plugin.explain("<FastWrap>", { assume_insert = true }).action, "wrap")
     end
     vim.b.pairs_rules = { ["("] = { wrap = "yes" } }

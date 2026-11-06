@@ -30,7 +30,7 @@ return function(h)
       newline = true,
       space = false,
     })
-    eq(vim.fn.maparg("$", "i", false, true).desc, "pairs.nvim $")
+    eq(vim.fn.maparg("$", "i", false, true).desc, "pairs.nvim: Insert or skip paired delimiter $")
   end)
   test("tex: invalid closer rejected", function()
     eq(pcall(plugin.setup, options({ close = "$" })), false)

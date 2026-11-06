@@ -32,8 +32,8 @@ return function(h)
     local copy = vim.deepcopy(opts)
     copy.pairs = { ['"'] = false, ["'"] = false }
     plugin.setup(copy)
-    eq(vim.fn.maparg('"', "i", false, true).desc, 'pairs.nvim "')
-    eq(vim.fn.maparg("'", "i", false, true).desc, "pairs.nvim '")
+    eq(vim.fn.maparg('"', "i", false, true).desc, 'pairs.nvim: Insert or skip paired delimiter "')
+    eq(vim.fn.maparg("'", "i", false, true).desc, "pairs.nvim: Insert or skip paired delimiter '")
   end)
 
   if not vim.env.PAIRS_TEST_PARSER_ROOT then
