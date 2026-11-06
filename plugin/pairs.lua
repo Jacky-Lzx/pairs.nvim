@@ -3,15 +3,15 @@ if vim.g.loaded_pairs_nvim then
 end
 vim.g.loaded_pairs_nvim = true
 
-vim.api.nvim_create_user_command("PairsRainbowToggle", function()
+require("pairs.user_command").create("PairsRainbowToggle", function()
   require("pairs.rainbow").toggle()
 end, { desc = "Toggle rainbow brackets in the current buffer" })
 
-vim.api.nvim_create_user_command("PairsToggle", function()
+require("pairs.user_command").create("PairsToggle", function()
   require("pairs").toggle()
 end, { desc = "Toggle pairs.nvim" })
 
-vim.api.nvim_create_user_command("PairsInspect", function(args)
+require("pairs.user_command").create("PairsInspect", function(args)
   local result = require("pairs").explain(args.args, { assume_insert = true })
   vim.notify(vim.inspect(result), vim.log.levels.INFO, { title = "pairs.nvim" })
 end, {
@@ -22,7 +22,7 @@ end, {
   end,
 })
 
-vim.api.nvim_create_user_command("PairsTrace", function(args)
+require("pairs.user_command").create("PairsTrace", function(args)
   local ok, err = pcall(require("pairs.trace").command, args.fargs, args.bang)
   if not ok then
     vim.notify(tostring(err), vim.log.levels.ERROR, { title = "pairs.nvim" })

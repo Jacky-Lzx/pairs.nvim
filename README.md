@@ -168,3 +168,10 @@ stylua --check lua tests plugin
 
 For parser fixtures and performance checks, see
 [benchmarks](docs/BENCHMARKS.md) and [implementation notes](docs/PLAN.md).
+
+## Command ownership
+
+Commands belong to the plugin; choose global entry keys and short aliases in
+your configuration. Registration reports same-name conflicts without replacing
+user commands. Reconfiguration refreshes only commands still owned by this
+plugin, and cleanup preserves subsequent user replacements.
