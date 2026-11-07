@@ -62,3 +62,10 @@ compatibility adapters still require their documented environment paths.
 The canonical runner copies live in `plugin-tools.nvim/tests/`. Maintainers can
 run `python3 scripts/sync-test-runner.py --check` there to detect drift, or use
 `--write` to refresh sibling copies without changing their case manifests.
+
+## Documentation checks
+
+`python3 tests/run.py unit --filter docs` checks local Markdown links and fragments,
+README Lua syntax, help entry points and isolated native setup. It does not
+download dependencies or write generated tags into the checkout. The canonical
+checker is maintained with the shared runner in plugin-tools.nvim.
