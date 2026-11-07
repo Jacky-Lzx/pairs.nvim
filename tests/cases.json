@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "default": [
+    "unit",
+    "ui"
+  ],
+  "defaults": {},
+  "cases": [
+    {
+      "name": "runner-contracts",
+      "suite": "unit",
+      "command": [
+        "{python}",
+        "tests/runner_checks.py"
+      ],
+      "files": [
+        "tests/runner_checks.py"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "setup_contract",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-l",
+        "tests/setup_contract.lua"
+      ],
+      "files": [
+        "tests/setup_contract.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "command_ownership",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-l",
+        "tests/command_ownership.lua"
+      ],
+      "files": [
+        "tests/command_ownership.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "run",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "tests/minimal_init.lua",
+        "-i",
+        "NONE",
+        "-l",
+        "tests/run.lua"
+      ],
+      "files": [
+        "tests/minimal_init.lua",
+        "tests/run.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "rainbow_snapshot",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "tests/minimal_init.lua",
+        "-i",
+        "NONE",
+        "-l",
+        "tests/rainbow_snapshot.lua"
+      ],
+      "files": [
+        "tests/minimal_init.lua",
+        "tests/rainbow_snapshot.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "rainbow_ui",
+      "suite": "ui",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "tests/minimal_init.lua",
+        "-i",
+        "NONE",
+        "-l",
+        "tests/rainbow_ui.lua"
+      ],
+      "files": [
+        "tests/minimal_init.lua",
+        "tests/rainbow_ui.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "space_ui",
+      "suite": "ui",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "tests/minimal_init.lua",
+        "-i",
+        "NONE",
+        "-l",
+        "tests/space_ui.lua"
+      ],
+      "files": [
+        "tests/minimal_init.lua",
+        "tests/space_ui.lua"
+      ],
+      "timeout": 90
+    }
+  ],
+  "support": {
+    "tests/tex.lua": "Loaded by tests/run.lua",
+    "tests/fast_wrap.lua": "Loaded by tests/run.lua",
+    "tests/templates.lua": "Loaded by tests/run.lua",
+    "tests/space.lua": "Loaded by tests/run.lua",
+    "tests/tex_environments.lua": "Loaded by tests/run.lua",
+    "tests/triples.lua": "Loaded by tests/run.lua",
+    "tests/long_fences.lua": "Loaded by tests/run.lua",
+    "tests/fast_wrap_member.lua": "Loaded by tests/run.lua",
+    "tests/space_skip.lua": "Loaded by tests/run.lua",
+    "tests/tex_arguments.lua": "Loaded by tests/run.lua",
+    "tests/fast_wrap_opener.lua": "Loaded by tests/run.lua",
+    "tests/fences.lua": "Loaded by tests/run.lua",
+    "tests/trace.lua": "Loaded by tests/run.lua",
+    "tests/surround_syntax.lua": "Loaded by tests/run.lua",
+    "tests/fast_wrap_call.lua": "Loaded by tests/run.lua",
+    "tests/tex_slash.lua": "Loaded by tests/run.lua",
+    "tests/generic.lua": "Loaded by tests/run.lua",
+    "tests/performance.lua": "Loaded by tests/run.lua",
+    "tests/multi_space.lua": "Loaded by tests/run.lua",
+    "tests/surround.lua": "Loaded by tests/run.lua",
+    "tests/performance_tex.lua": "Loaded by tests/run.lua",
+    "tests/rainbow.lua": "Loaded by tests/run.lua",
+    "tests/runner.sh": "Output helper retained for benchmark scripts",
+    "tests/run.sh": "Stable shell entry point for tests/run.py"
+  },
+  "manual": {
+    "tests/install-parsers.sh": "Explicit fixture installation, benchmark or manual acceptance tool; see testing documentation",
+    "tests/bench.sh": "Explicit fixture installation, benchmark or manual acceptance tool; see testing documentation",
+    "tests/bench-rainbow.sh": "Explicit fixture installation, benchmark or manual acceptance tool; see testing documentation",
+    "tests/bench.lua": "Explicit fixture installation, benchmark or manual acceptance tool; see testing documentation",
+    "tests/bench_tex.lua": "Explicit fixture installation, benchmark or manual acceptance tool; see testing documentation",
+    "tests/bench_rainbow.lua": "Explicit fixture installation, benchmark or manual acceptance tool; see testing documentation"
+  }
+}

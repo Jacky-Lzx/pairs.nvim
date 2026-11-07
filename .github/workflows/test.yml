@@ -14,9 +14,15 @@ jobs:
           version: ${{ matrix.version }}
           neovim: true
       - run: ./tests/install-parsers.sh "$RUNNER_TEMP/pairs-parsers"
-      - run: ./tests/run.sh
+      - run: sh tests/run.sh --output "$RUNNER_TEMP/test-results"
         env:
           PAIRS_TEST_PARSER_ROOT: ${{ runner.temp }}/pairs-parsers
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/test-results
+          if-no-files-found: ignore
       - run: ./tests/bench.sh
         env:
           PAIRS_TEST_PARSER_ROOT: ${{ runner.temp }}/pairs-parsers
