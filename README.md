@@ -187,3 +187,10 @@ or commands. Repeating setup must not accumulate automatic registrations.
 configuration, preserving later user replacements; it is safe to repeat.
 `teardown()` remains available. New setup resolves from defaults and validates
 before changing an existing pairing configuration.
+
+## Health and inspection
+
+Health reports actionable failures and a compact result for applicable checks. Disabled,
+optional and not-yet-activated features do not warn solely because they are inactive.
+Inspection does not configure plugins, start services or install dependencies.
+Use `:PairsInfo` for detailed configuration and runtime information.
