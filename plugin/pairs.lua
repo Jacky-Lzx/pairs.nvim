@@ -13,7 +13,7 @@ end, { desc = "Toggle pairs.nvim" })
 
 require("pairs.user_command").create("PairsInspect", function(args)
   local result = require("pairs").explain(args.args, { assume_insert = true })
-  vim.notify(vim.inspect(result), vim.log.levels.INFO, { title = "pairs.nvim" })
+  vim.notify(vim.inspect(result), vim.log.levels.INFO, { title = "pairs.nvim", filetype = "lua" })
 end, {
   nargs = 1,
   desc = "Explain insertion before the cursor without editing text",
@@ -25,7 +25,7 @@ end, {
 require("pairs.user_command").create("PairsTrace", function(args)
   local ok, err = pcall(require("pairs.trace").command, args.fargs, args.bang)
   if not ok then
-    vim.notify(tostring(err), vim.log.levels.ERROR, { title = "pairs.nvim" })
+    vim.notify(tostring(err), vim.log.levels.ERROR, { title = "pairs.nvim", filetype = "text" })
   end
 end, {
   nargs = "+",

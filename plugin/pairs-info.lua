@@ -8,6 +8,6 @@ require("pairs.user_command").create("PairsInfo", function()
       ),
     }),
     vim.log.levels.INFO,
-    { title = "pairs.nvim" }
+    { title = "pairs.nvim", filetype = "lua" }
   )
 end, { desc = "Inspect configuration and current runtime state" })
